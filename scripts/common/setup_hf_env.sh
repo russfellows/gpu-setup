@@ -6,13 +6,19 @@
 # HF_HOME pointing at the bulk-storage mount. Creates the cache directory and
 # hands ownership to the invoking user.
 #
-# Refuses to run unless the storage mount is actually mounted — better a
-# clear error now than silently caching to the root filesystem and filling
-# it up at the first model download.
+# Two topologies are supported:
+#   A) Dedicated data volume (typical):
+#      A separate NVMe array is mounted at STORAGE_MOUNT (/mnt/data).
+#      HF_HOME_PATH defaults to /mnt/data/huggingface.
+#   B) Root IS the bulk storage (e.g. NVMe RAID-0 mounted at /):
+#      If STORAGE_MOUNT is not present but root has >= ROOT_MIN_GB free,
+#      the script auto-switches to HF_HOME_PATH=/data/huggingface on root.
+#      Override HF_HOME_PATH to use a different path.
 #
 # Env vars:
 #   HF_HOME_PATH     Cache root (default /mnt/data/huggingface)
 #   STORAGE_MOUNT    Mount that must be present (default /mnt/data)
+#   ROOT_MIN_GB      Minimum free GB on / to accept root fallback (default 500)
 # ==============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -21,17 +27,33 @@ source "${SCRIPT_DIR}/../lib/common.sh"
 
 HF_HOME_PATH="${HF_HOME_PATH:-/mnt/data/huggingface}"
 STORAGE_MOUNT="${STORAGE_MOUNT:-/mnt/data}"
+ROOT_MIN_GB="${ROOT_MIN_GB:-500}"
 
 need_root
 
 REAL_USER="$(real_user)"
 REAL_GROUP="$(id -gn "$REAL_USER")"
 
-# ---------- Verify the bulk mount is actually mounted ----------
-if ! findmnt -n "$STORAGE_MOUNT" >/dev/null 2>&1; then
-  die "$STORAGE_MOUNT is not mounted. Run scripts/common/setup_storage.sh --execute first, or override STORAGE_MOUNT."
+# ---------- Verify bulk storage is available ----------
+if findmnt -n "$STORAGE_MOUNT" >/dev/null 2>&1; then
+  ok "$STORAGE_MOUNT is mounted."
+else
+  # Fall back to root filesystem if it has enough space (topology B).
+  ROOT_FREE_GB=$(df -BG / | awk 'NR==2 {gsub("G","",$4); print $4}')
+  if [ "$ROOT_FREE_GB" -ge "$ROOT_MIN_GB" ]; then
+    warn "$STORAGE_MOUNT is not mounted, but root has ${ROOT_FREE_GB} GB free (>= ${ROOT_MIN_GB} GB threshold)."
+    warn "Using root filesystem for HF cache (topology B: root IS bulk storage)."
+    STORAGE_MOUNT="/"
+    # Only override HF_HOME_PATH if the caller didn't already set it to
+    # something other than the /mnt/data default.
+    if [ "$HF_HOME_PATH" = "/mnt/data/huggingface" ]; then
+      HF_HOME_PATH="/data/huggingface"
+    fi
+    ok "Auto-selected HF_HOME_PATH=$HF_HOME_PATH"
+  else
+    die "$STORAGE_MOUNT is not mounted and root has only ${ROOT_FREE_GB} GB free (< ${ROOT_MIN_GB} GB). Run scripts/common/setup_storage.sh --execute first, or override STORAGE_MOUNT/HF_HOME_PATH."
+  fi
 fi
-ok "$STORAGE_MOUNT is mounted."
 
 # ---------- Create cache dir ----------
 if [ -d "$HF_HOME_PATH" ]; then
