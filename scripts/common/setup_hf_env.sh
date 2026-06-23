@@ -66,6 +66,12 @@ export HF_HOME="${HF_HOME_PATH}"
 export HUGGINGFACE_HUB_CACHE="\$HF_HOME/hub"
 export HF_HUB_ENABLE_HF_TRANSFER=1
 # Recipes mount HF_HOME into containers at /root/.cache/huggingface
+
+# umask 002: new files are group-writable (664) and dirs are group-writable
+# (775), so any user's model downloads are readable and usable by all users
+# on this shared GPU server. The sticky bit on HF_HOME ensures users can
+# only delete their own files.
+umask 002
 EOF
 chmod 0644 "$PROFILE"
 
