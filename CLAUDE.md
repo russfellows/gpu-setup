@@ -130,11 +130,12 @@ live with the user. The harness already does this; don't change it.
 - **`hf` not on PATH**: `setup_prereqs.sh` installs it via `uv tool
   install`, which puts it in `~/.local/bin`. New shells pick that up via
   `~/.profile`; existing shells need `exec $SHELL -l`.
-- **`/mnt/data` not mounted — NVMe drives are the root FS**: Some hosts
+- **All NVMe drives are the root FS (no separate data volume)**: Some hosts
   (e.g. TensorWave MI355X nodes) pre-configure all NVMe drives as a RAID-0
   root filesystem. `setup_storage.sh` correctly declines to touch them.
-  `setup_hf_env.sh` auto-detects this (root has >= 500 GB free) and falls
-  back to `/data/huggingface` on root instead of erroring. No action needed.
+  `setup_hf_env.sh` no longer requires a dedicated mount — it creates
+  `/mnt/data` as a plain directory if needed and checks free space instead.
+  No extra action required.
 - **NUMA mismatches on AMD**: the `qwen3-next-80b/amd_vllm_numa` variant
   bakes in cpuset values for a *specific* reference host (GPUs 0–3 on
   NUMA 0, GPUs 4–7 on NUMA 1). On a different topology those values
