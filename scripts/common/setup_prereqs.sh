@@ -91,8 +91,8 @@ fi
 # ---------- 4. Hugging Face CLI ----------
 # Install as a uv tool under REAL_USER so it lands in ~/.local/bin without
 # polluting any project venv.
-if sudo -u "$REAL_USER" bash -lc 'command -v huggingface-cli' >/dev/null 2>&1; then
-  ok "huggingface-cli already available."
+if sudo -u "$REAL_USER" bash -lc 'command -v hf' >/dev/null 2>&1; then
+  ok "Hugging Face CLI ('hf') already available."
 else
   log "Installing huggingface_hub[cli] as a uv tool..."
   sudo -u "$REAL_USER" "$UV_BIN" tool install 'huggingface_hub[cli]'
@@ -108,7 +108,7 @@ cat <<EOF
    1. Re-source your shell so ~/.local/bin is on PATH:
         exec \$SHELL -l
    2. Authenticate GitHub:    gh auth login
-   3. Authenticate HF Hub:    huggingface-cli login
+   3. Authenticate HF Hub:    hf auth login
    4. Run the vendor-specific GPU setup (NVIDIA or AMD), or use bootstrap.sh.
 ==============================================================================
 EOF
