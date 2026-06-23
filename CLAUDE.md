@@ -1,7 +1,7 @@
 # CLAUDE.md — gpu-setup
 
 Operational guidance for Claude Code sessions working inside this repo.
-Repo-level rules; the parent `~/Documents/Code/CLAUDE.md` (prime directives:
+Repo-level rules; the parent `~/Code/CLAUDE.md` (prime directives:
 no unapproved code edits, no unauthorized pushes) still applies on top.
 
 ## What this repo is

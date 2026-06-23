@@ -73,7 +73,7 @@ if [ "$VENDOR" = "nvidia" ]; then
   log "  NVSwitches: $HAS_NVSWITCH"
 else
   log "AMD hardware (lspci):"
-  lspci -nn | grep -i 'amd\|advanced micro' | grep -E '\[(0300|0302|0380)\]' | sed 's/^/    /'
+  lspci -nn | grep -i 'amd\|advanced micro' | grep -E '\[(0300|0302|0380|1200)\]' | sed 's/^/    /'
 fi
 
 # ---------- Plan ----------

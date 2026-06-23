@@ -48,10 +48,13 @@ count_nvidia_gpus() {
 # Robust vendor counting via PCI vendor IDs.
 #   NVIDIA vendor: 10de
 #   AMD    vendor: 1002
+# Classes covered:
+#   0300 VGA, 0302 3D, 0380 Display — traditional GPU classes
+#   1200 Processing accelerators     — AMD Instinct MI300X and similar HPC GPUs
 count_gpus_by_vendor() {
   local vendor="$1"
   lspci -nn 2>/dev/null \
-    | grep -E '\[(0300|0302|0380)\]' \
+    | grep -E '\[(0300|0302|0380|1200)\]' \
     | grep -ci "\\[${vendor}:" || true
 }
 

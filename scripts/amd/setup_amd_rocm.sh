@@ -23,8 +23,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=../lib/common.sh
 source "${SCRIPT_DIR}/../lib/common.sh"
 
-ROCM_VERSION="${ROCM_VERSION:-7.2.4}"
-ROCM_DEB_BUILD="${ROCM_DEB_BUILD:-7.2.4.70204-1}"
+ROCM_VERSION="${ROCM_VERSION:-7.2.3}"
+ROCM_DEB_BUILD="${ROCM_DEB_BUILD:-7.2.3.60203-1}"
 FORCE_REINSTALL="${FORCE_REINSTALL:-0}"
 ASSUME_YES="${ASSUME_YES:-1}"
 [ "$ASSUME_YES" = "1" ] && export DEBIAN_FRONTEND=noninteractive
@@ -64,6 +64,10 @@ rocm_stack_healthy() {
 
 if [ "$FORCE_REINSTALL" != "1" ] && rocm_stack_healthy; then
   ok "ROCm stack appears healthy. Skipping install. Set FORCE_REINSTALL=1 to override."
+  # Still ensure group membership even if we skip the install.
+  log "Ensuring $REAL_USER is in render,video groups..."
+  usermod -a -G render,video "$REAL_USER"
+  ok "Group membership confirmed. Changes take effect on next login."
   exit 0
 fi
 
@@ -77,7 +81,8 @@ rm -f /etc/apt/sources.list.d/amdgpu.list \
       /etc/apt/preferences.d/rocm-pin-600
 
 # ---------- amdgpu-install bootstrap ----------
-DEB_URL="https://repo.radeon.com/amdgpu-install/${ROCM_VERSION}/ubuntu/noble/amdgpu-install_${ROCM_DEB_BUILD}_all.deb"
+UBUNTU_CODENAME="$(. /etc/os-release && echo "$VERSION_CODENAME")"
+DEB_URL="https://repo.radeon.com/amdgpu-install/${ROCM_VERSION}/ubuntu/${UBUNTU_CODENAME}/amdgpu-install_${ROCM_DEB_BUILD}_all.deb"
 log "Downloading amdgpu-install: $DEB_URL"
 tmp="$(mktemp -d)"
 wget -nv -O "$tmp/amdgpu-install.deb" "$DEB_URL"

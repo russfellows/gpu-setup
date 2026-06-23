@@ -9,15 +9,31 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../lib/common.sh"
 
 fail=0
+CHECK_USER="${SUDO_USER:-${USER:-$(id -un)}}"
 
-log "1. ROCm version:"
+log "1. GPU device permissions (render/video groups for $CHECK_USER):"
+MISSING_GROUPS=()
+for grp in render video; do
+  if id -nG "$CHECK_USER" 2>/dev/null | tr ' ' '\n' | grep -qx "$grp"; then
+    ok "  $CHECK_USER is in group '$grp'."
+  else
+    err "  $CHECK_USER is NOT in group '$grp' — amd-smi/rocm-smi will have limited access."
+    MISSING_GROUPS+=("$grp")
+  fi
+done
+if [ "${#MISSING_GROUPS[@]}" -gt 0 ]; then
+  warn "  Fix: sudo usermod -aG ${MISSING_GROUPS[*]} $CHECK_USER  (then log out and back in)"
+  fail=1
+fi
+
+log "2. ROCm version:"
 if [ -f /opt/rocm/.info/version ]; then
   ok "ROCm $(cat /opt/rocm/.info/version)"
 else
   err "/opt/rocm/.info/version missing."; fail=1
 fi
 
-log "2. rocm-smi:"
+log "3. rocm-smi:"
 if smoke rocm-smi --showproductname; then
   rocm-smi --showproductname
   ok "rocm-smi works."
@@ -25,7 +41,7 @@ else
   err "rocm-smi failed."; fail=1
 fi
 
-log "3. HIP compute smoke test (vector add):"
+log "4. HIP compute smoke test (vector add):"
 SRC="$(mktemp --suffix=.cpp)"
 BIN="$(mktemp -u)"
 cat >"$SRC" <<'EOF'
