@@ -44,14 +44,17 @@ fi
 ok "$STORAGE_MOUNT is available (${FREE_GB} GB free)."
 
 # ---------- Create cache dir ----------
+# 1777 (sticky + world-writable): any user can create files, but only the
+# owner of each file can delete it — same pattern as /tmp. Allows multiple
+# users to share the model cache without re-downloading.
 if [ -d "$HF_HOME_PATH" ]; then
   ok "$HF_HOME_PATH already exists."
 else
   log "Creating $HF_HOME_PATH ..."
-  install -d -m 0775 "$HF_HOME_PATH"
+  mkdir -p "$HF_HOME_PATH"
 fi
-log "Setting ownership of $HF_HOME_PATH to $REAL_USER:$REAL_GROUP ..."
-chown -R "$REAL_USER:$REAL_GROUP" "$HF_HOME_PATH"
+log "Setting $HF_HOME_PATH to 1777 (sticky, world-writable)..."
+chmod 1777 "$HF_HOME_PATH"
 
 # ---------- Write /etc/profile.d/huggingface.sh ----------
 PROFILE="/etc/profile.d/huggingface.sh"
