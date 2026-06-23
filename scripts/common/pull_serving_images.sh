@@ -16,7 +16,8 @@
 #   TRITON_IMAGE        NVIDIA: nvcr.io/nvidia/tritonserver:25.06-py3
 #   TRTLLM_IMAGE        NVIDIA: nvcr.io/nvidia/tensorrt-llm/release:latest
 #   SGLANG_IMAGE        NVIDIA: lmsysorg/sglang:latest
-#   SGLANG_ROCM_IMAGE   AMD:    lmsysorg/sglang:rocm
+#   SGLANG_ROCM_IMAGE   AMD:    auto-selected by GPU family (mi35x or mi30x);
+#                               override to pin a specific tag
 #   ATOM_IMAGE          AMD:    (gated repo) — only pulled if INCLUDE_ATOM=1
 #   INCLUDE_ATOM        "1" to pull ATOM image (requires repo access)
 #   DRY_RUN             "1" to print what would be pulled and exit
@@ -35,8 +36,21 @@ VLLM_ROCM_IMAGE="${VLLM_ROCM_IMAGE:-vllm/vllm-openai-rocm:latest}"
 TRITON_IMAGE="${TRITON_IMAGE:-nvcr.io/nvidia/tritonserver:25.06-py3}"
 TRTLLM_IMAGE="${TRTLLM_IMAGE:-nvcr.io/nvidia/tensorrt-llm/release:latest}"
 SGLANG_IMAGE="${SGLANG_IMAGE:-lmsysorg/sglang:latest}"
-SGLANG_ROCM_IMAGE="${SGLANG_ROCM_IMAGE:-lmsysorg/sglang:rocm}"
 ATOM_IMAGE="${ATOM_IMAGE:-}"
+
+# SGLang AMD: auto-select by GPU family if caller did not override.
+# Tags follow the pattern: lmsysorg/sglang:<version>-rocm<major><minor>-<family>
+# Latest as of 2026-06: v0.5.13.post1
+if [ -z "${SGLANG_ROCM_IMAGE:-}" ]; then
+  _AMD_FAMILY="$(amd_gpu_family)"
+  case "$_AMD_FAMILY" in
+    mi35x)  SGLANG_ROCM_IMAGE="lmsysorg/sglang:v0.5.13.post1-rocm720-mi35x" ;;
+    mi30x)  SGLANG_ROCM_IMAGE="lmsysorg/sglang:v0.5.13.post1-rocm720-mi30x" ;;
+    *)      SGLANG_ROCM_IMAGE="lmsysorg/sglang:v0.5.13.post1-rocm720-mi35x"
+            warn "Unknown AMD GPU family; defaulting SGLang image to mi35x tag." ;;
+  esac
+  log "Auto-selected SGLang ROCm image for $_AMD_FAMILY: $SGLANG_ROCM_IMAGE"
+fi
 
 if ! have docker; then
   die "docker is not installed. Run scripts/common/setup_docker.sh first."

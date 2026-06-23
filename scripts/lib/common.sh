@@ -58,6 +58,21 @@ count_gpus_by_vendor() {
     | grep -ci "\\[${vendor}:" || true
 }
 
+# Detect AMD GPU sub-family for image tag selection.
+# Returns "mi35x" (MI355X/MI350X), "mi30x" (MI300X/MI308X), or "unknown".
+# MI355X PCI device: 0x75a3  |  MI300X PCI device: 0x74a0/0x74a1
+amd_gpu_family() {
+  local ids
+  ids=$(lspci -nn 2>/dev/null | grep '\[1002:' | grep -oE '\[1002:[0-9a-f]+\]' | sort -u)
+  if echo "$ids" | grep -qE '\[1002:75'; then
+    echo "mi35x"
+  elif echo "$ids" | grep -qE '\[1002:74'; then
+    echo "mi30x"
+  else
+    echo "unknown"
+  fi
+}
+
 # ---------- Command checks ----------
 have() { command -v "$1" >/dev/null 2>&1; }
 
