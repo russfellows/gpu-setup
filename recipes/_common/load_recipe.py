@@ -182,6 +182,13 @@ def main() -> int:
     else:
         print("EXTRA_DOCKER_FLAGS=()")
 
+    # ---- Bench client extra args ----
+    bench_extra = v.get("bench_extra_args", [])
+    if bench_extra:
+        emit_array("BENCH_EXTRA_ARGS", bench_extra)
+    else:
+        print("BENCH_EXTRA_ARGS=()")
+
     # ---- Extra files: mounted at /recipe/<basename> ----
     files = v.get("extra_files", [])
     if files:

@@ -26,9 +26,10 @@ ready_timeout_s    = 3600
 # vLLM-rocm nightly digest and the AITER commit it pulls the FP4 tuning
 # CSV from, so re-runs reproduce the same artifact.
 [variants.amd_vllm]
-vendor   = "amd"
-stack    = "vllm"
-model_id = "amd/Kimi-K2.6-MXFP4"
+vendor           = "amd"
+stack            = "vllm"
+model_id         = "amd/Kimi-K2.6-MXFP4"
+bench_extra_args = ["--trust-remote-code"]
 # `image` is the BASE image (used in the Dockerfile's FROM line); the
 # harness builds and tags the actual image per the [variants.amd_vllm.build]
 # block, then uses that tag.
@@ -83,9 +84,10 @@ tag        = "gpu-setup/vllm-rocm-kimi-k2-6-mxfp4:local"
 # card. Floating tag, so re-runs aren't bit-identical; see provenance.json
 # for the exact digest each run resolved to.
 [variants.amd_vllm_nightly]
-vendor   = "amd"
-stack    = "vllm"
-model_id = "amd/Kimi-K2.6-MXFP4"
+vendor           = "amd"
+stack            = "vllm"
+model_id         = "amd/Kimi-K2.6-MXFP4"
+bench_extra_args = ["--trust-remote-code"]
 image   = "rocm/vllm-dev:nightly_main"
 port    = 8000
 
@@ -135,9 +137,10 @@ build_args = { BASE_IMAGE = "rocm/vllm-dev:nightly_main" }
 # Not reproducible: both the base image tag and the amd-quark `main` ref
 # move over time.
 [variants.amd_vllm_quark]
-vendor   = "amd"
-stack    = "vllm"
-model_id = "amd/Kimi-K2.6-MXFP4"
+vendor           = "amd"
+stack            = "vllm"
+model_id         = "amd/Kimi-K2.6-MXFP4"
+bench_extra_args = ["--trust-remote-code"]
 image   = "rocm/vllm-dev:nightly_main"
 port    = 8000
 
