@@ -36,6 +36,7 @@ run_bench() {
       ;;
   esac
 
+  # shellcheck disable=SC2054  # commas are inside argument values, not array separators
   cmd+=(
     --model="$MODEL_ID"
     --backend=vllm
@@ -60,5 +61,5 @@ run_bench() {
   fi
 
   log "Bench: ISL=$ISL OSL=$OSL CONC=$CONC -> $RESULT_FILENAME"
-  docker exec --user "$(id -u):$(id -g)" "$CONTAINER_NAME" "${cmd[@]}"
+  docker exec "$CONTAINER_NAME" "${cmd[@]}"
 }

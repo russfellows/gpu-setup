@@ -6,6 +6,7 @@
 # /dev/kfd for the compute driver, /dev/dri for display/render, plus the
 # render+video groups so the container's processes can talk to them.
 
+# shellcheck disable=SC2034  # used externally by sweep.sh via source
 AMD_DOCKER_FLAGS=(
   --device=/dev/kfd
   --device=/dev/dri

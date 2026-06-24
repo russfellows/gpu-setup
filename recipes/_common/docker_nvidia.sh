@@ -6,6 +6,7 @@
 # docker (scripts/common/setup_docker.sh / scripts/nvidia/setup_nvidia.sh
 # handle that).
 
+# shellcheck disable=SC2034  # used externally by sweep.sh via source
 NVIDIA_DOCKER_FLAGS=(
   --runtime=nvidia
   --gpus=all

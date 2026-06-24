@@ -29,7 +29,6 @@ STORAGE_MIN_GB="${STORAGE_MIN_GB:-100}"
 need_root
 
 REAL_USER="$(real_user)"
-REAL_GROUP="$(id -gn "$REAL_USER")"
 
 # ---------- Ensure STORAGE_MOUNT exists and has enough space ----------
 if [ ! -d "$STORAGE_MOUNT" ]; then

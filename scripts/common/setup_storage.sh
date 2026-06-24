@@ -303,6 +303,7 @@ log "Proceeding with --execute."
 
 if [ "$LEVEL" != "none" ]; then
   log "Creating md array..."
+  # shellcheck disable=SC2046  # intentional: unquoted $() word-splits spare-device args for mdadm
   mdadm --create --verbose --run "$MD_DEV" \
         --name="$STORAGE_RAID_NAME" \
         --level="${LEVEL/raid/}" \

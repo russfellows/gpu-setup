@@ -251,6 +251,8 @@ EOF
   if [ "$DRY_RUN" = "1" ]; then
     log "(dry-run) would write ${RESULTS_DIR}/provenance.json"
   else
+  # PROV_* vars are env-var prefixes passed to write_provenance.py, not bash variables.
+  # shellcheck disable=SC2034,SC2015
   PROV_RESULTS_DIR="$RESULTS_DIR" \
   PROV_TIMESTAMP="$TS" \
   PROV_MODEL_NAME="$MODEL_NAME" \
@@ -293,6 +295,7 @@ EOF
 
         docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
         # Guarantee cleanup even on SIGINT/SIGTERM or script exit.
+        # shellcheck disable=SC2064  # expansion at trap-set time is intentional: captures current loop value of CONTAINER_NAME
         trap "docker rm -f '$CONTAINER_NAME' >/dev/null 2>&1 || true" EXIT INT TERM
 
         # Launch detached (no --rm: we need to capture logs after exit).
