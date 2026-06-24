@@ -124,6 +124,20 @@ run_sweep() {
   fi
   local -a HF_MOUNT=(-v "${HF_HOST_DIR}:/root/.cache/huggingface")
 
+  # ---------- Torch compile cache mount ----------
+  # Inductor/cudagraph compilation artifacts are cached under
+  # ~/.cache/torch inside the container. Mounting a persistent host
+  # directory means compiled graphs survive container restarts, avoiding
+  # recompilation on every run (which can take 30+ minutes for large MoE
+  # models with use_inductor_graph_partition=true).
+  local TORCH_CACHE_HOST="${HF_HOST_DIR}/../torch_compile_cache"
+  TORCH_CACHE_HOST="$(cd "$(dirname "$TORCH_CACHE_HOST")" && pwd)/$(basename "$TORCH_CACHE_HOST")"
+  if [ "$DRY_RUN" != "1" ]; then
+    mkdir -p "$TORCH_CACHE_HOST"
+    chmod 1777 "$TORCH_CACHE_HOST"
+  fi
+  local -a TORCH_CACHE_MOUNT=(-v "${TORCH_CACHE_HOST}:/root/.cache/torch")
+
   local -a HF_TOKEN_ENV=()
   [ -n "${HF_TOKEN:-}" ] && HF_TOKEN_ENV=(-e "HF_TOKEN=${HF_TOKEN}")
 
@@ -281,6 +295,7 @@ EOF
         docker run -d --name "$CONTAINER_NAME" \
           "${VENDOR_FLAGS[@]}" \
           "${HF_MOUNT[@]}" \
+          "${TORCH_CACHE_MOUNT[@]}" \
           "${FILE_MOUNTS[@]}" \
           -v "${RESULTS_DIR}:/results" \
           "${HF_TOKEN_ENV[@]}" \

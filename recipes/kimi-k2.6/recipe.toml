@@ -17,7 +17,7 @@ sweep_tp           = [4]
 sweep_isl_osl      = ["1024,1024", "1024,8192", "8192,1024"]
 sweep_conc         = [4, 8, 16, 32, 64, 128, 256]
 random_range_ratio = 0.8
-ready_timeout_s    = 1800
+ready_timeout_s    = 3600
 
 
 # ----- AMD / vLLM (MXFP4) ----------------------------------------------------
