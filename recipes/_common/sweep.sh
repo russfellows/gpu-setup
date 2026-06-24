@@ -274,17 +274,18 @@ EOF
         log "---- Run: tp=$TP isl=$ISL osl=$OSL conc=$CONC ----"
 
         docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
+        # Guarantee cleanup even on SIGINT/SIGTERM or script exit.
+        trap "docker rm -f '$CONTAINER_NAME' >/dev/null 2>&1 || true" EXIT INT TERM
 
-        # Launch detached. bash -lc loads /etc/profile.d so things like the
-        # CUDA env vars from /etc/profile.d/cuda.sh are in scope.
-        docker run -d --rm --name "$CONTAINER_NAME" \
+        # Launch detached (no --rm: we need to capture logs after exit).
+        docker run -d --name "$CONTAINER_NAME" \
           "${VENDOR_FLAGS[@]}" \
           "${HF_MOUNT[@]}" \
           "${FILE_MOUNTS[@]}" \
           -v "${RESULTS_DIR}:/results" \
           "${HF_TOKEN_ENV[@]}" \
-          "${EXTRA_DOCKER_ENV[@]:-}" \
-          "${EXTRA_DOCKER_FLAGS[@]:-}" \
+          ${EXTRA_DOCKER_ENV[@]+"${EXTRA_DOCKER_ENV[@]}"} \
+          ${EXTRA_DOCKER_FLAGS[@]+"${EXTRA_DOCKER_FLAGS[@]}"} \
           --entrypoint=/bin/bash \
           "$IMAGE" -lc "$_SRV_CMD_STR" \
           >/dev/null

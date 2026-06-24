@@ -17,6 +17,8 @@
 #   BENCH_EXTRA_ARGS (array)
 
 run_bench() {
+  # Ensure BENCH_EXTRA_ARGS is always an array, even if the caller left it unset.
+  BENCH_EXTRA_ARGS=("${BENCH_EXTRA_ARGS[@]+"${BENCH_EXTRA_ARGS[@]}"}")
   local num_warmups=$(( CONC * 2 ))
   local num_prompts=$(( CONC * 10 ))
 
@@ -53,7 +55,7 @@ run_bench() {
     --percentile-metrics=ttft,tpot,itl,e2el
     --metric-percentiles=25,50,75,90,95,99
   )
-  if [ "${#BENCH_EXTRA_ARGS[@]:-0}" -gt 0 ]; then
+  if [ "${#BENCH_EXTRA_ARGS[@]}" -gt 0 ]; then
     cmd+=("${BENCH_EXTRA_ARGS[@]}")
   fi
 
