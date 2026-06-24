@@ -59,13 +59,17 @@ chmod 1777 "$HF_HOME_PATH"
 # ---------- Write /etc/profile.d/huggingface.sh ----------
 PROFILE="/etc/profile.d/huggingface.sh"
 log "Writing $PROFILE ..."
-cat >"$PROFILE" <<EOF
+cat >"$PROFILE" <<'EOF'
 # Managed by gpu-setup: scripts/common/setup_hf_env.sh
 # Hugging Face caches and downloads land on bulk storage, not the root FS.
-export HF_HOME="${HF_HOME_PATH}"
-export HUGGINGFACE_HUB_CACHE="\$HF_HOME/hub"
-export HF_HUB_ENABLE_HF_TRANSFER=1
+export HF_HOME="/mnt/data/huggingface"
+export HUGGINGFACE_HUB_CACHE="$HF_HOME/hub"
+export HF_XET_HIGH_PERFORMANCE=1
 # Recipes mount HF_HOME into containers at /root/.cache/huggingface
+
+# Each user's token lives in their own home dir (where `hf auth login` puts
+# it). HF_TOKEN_PATH tells huggingface_hub to look there rather than $HF_HOME.
+export HF_TOKEN_PATH="$HOME/.cache/huggingface/token"
 
 # umask 002: new files are group-writable (664) and dirs are group-writable
 # (775), so any user's model downloads are readable and usable by all users
