@@ -106,7 +106,10 @@ def main() -> int:
     print(f"# Recipe TOML: {toml_path}")
     print(f"# Variant: {variant}")
     print(f"MODEL_NAME={quote(recipe['model_name'])}")
-    print(f"MODEL_ID={quote(recipe['model_id'])}")
+    # Variant-level model_id overrides recipe-level when set (e.g. kimi uses
+    # different HF repo IDs for AMD/MXFP4 vs NVIDIA/NVFP4 variants).
+    model_id = v.get("model_id", recipe["model_id"])
+    print(f"MODEL_ID={quote(model_id)}")
     print(f"VARIANT_NAME={quote(variant)}")
     print(f"VENDOR={quote(v['vendor'])}")
     print(f"STACK={quote(v['stack'])}")
