@@ -328,6 +328,12 @@ EOF
         fi
         ok "Server is ready (after ${waited}s)."
 
+        # Remove any stale result file before the bench run. vllm bench serve
+        # appends (not overwrites) when the file exists — caused by the warmup
+        # phase writing an interim JSON before the final result is written.
+        # Deleting here ensures each bench run produces exactly one JSON object.
+        rm -f "${RESULTS_DIR}/${RESULT_FILENAME}"
+
         if run_bench; then
           echo "$TP,$ISL,$OSL,$CONC,ok,$RESULT_FILENAME" >> "$SUMMARY"
         else
@@ -341,6 +347,13 @@ EOF
       done
     done
   done
+
+  # Restore ownership: the bench client runs as root inside the container and
+  # writes result files as uid 0. Chown the entire results dir back to the
+  # invoking user so they can read/delete results without sudo.
+  local _invoke_user="${SUDO_USER:-$USER}"
+  chown -R "$_invoke_user" "$RESULTS_DIR" 2>/dev/null \
+    || warn "chown of $RESULTS_DIR failed — result files may be root-owned."
 
   echo
   ok "Sweep complete. Summary: $SUMMARY"
