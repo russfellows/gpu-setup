@@ -31,7 +31,7 @@ stack   = "vllm"
 # `image` is the BASE image (used in the Dockerfile's FROM line); the
 # harness builds and tags the actual image per the [variants.amd_vllm.build]
 # block, then uses that tag.
-image   = "vllm/vllm-openai-rocm:nightly-d0975a4b50140a9d953f00955a1cbb2a4945edef"
+image   = "vllm/vllm-openai-rocm:nightly-04c2a8deac44fdb1ca3e2b5ec3e6bf16f3f6a914"
 port    = 8000
 
 server_entrypoint = "vllm serve"

@@ -12,7 +12,7 @@
 #   AMD_QUARK_REPO   Git URL for amd-quark (only used when WITH_AMD_QUARK=1).
 #   AMD_QUARK_REF    Git ref to check out (default: main).
 
-ARG BASE_IMAGE=vllm/vllm-openai-rocm:nightly-d0975a4b50140a9d953f00955a1cbb2a4945edef
+ARG BASE_IMAGE=vllm/vllm-openai-rocm:nightly-04c2a8deac44fdb1ca3e2b5ec3e6bf16f3f6a914
 FROM ${BASE_IMAGE}
 
 ARG AITER_COMMIT=78ef4be9d621e3660c89cfb611679fb12fe10ed4
