@@ -26,7 +26,7 @@ APT_FLAGS=(-y)
 [ "$ASSUME_YES" = "1" ] && export DEBIAN_FRONTEND=noninteractive
 
 need_root
-require_ubuntu_2404
+require_ubuntu_2204_plus
 
 REAL_USER="$(real_user)"
 REAL_HOME="$(getent passwd "$REAL_USER" | cut -d: -f6)"
@@ -34,7 +34,7 @@ log "Setting up prerequisites for user: $REAL_USER (home: $REAL_HOME)"
 
 # ---------- 1. Base packages ----------
 BASE_PKGS=(curl wget git gnupg ca-certificates lsb-release software-properties-common
-           build-essential gcc g++ make pkg-config
+           build-essential gcc g++ make cmake ninja-build pkg-config
            jq tmux htop unzip)
 
 missing=()

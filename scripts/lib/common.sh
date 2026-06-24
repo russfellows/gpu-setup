@@ -24,11 +24,16 @@ real_user() {
 }
 
 # ---------- OS ----------
-require_ubuntu_2404() {
-  local ver
+require_ubuntu_2204_plus() {
+  local ver major minor
   ver=$(. /etc/os-release && echo "$VERSION_ID")
+  major="${ver%%.*}"
+  minor="${ver##*.}"
+  if [ "$major" -lt 22 ] || { [ "$major" -eq 22 ] && [ "$minor" -lt 4 ]; }; then
+    die "Ubuntu 22.04 or later required; detected $ver."
+  fi
   if [ "$ver" != "24.04" ]; then
-    warn "Target OS is Ubuntu 24.04; detected $ver. Proceeding, but YMMV."
+    warn "Scripts are developed on Ubuntu 24.04; detected $ver. Some apt sources may use a different codename."
   fi
 }
 

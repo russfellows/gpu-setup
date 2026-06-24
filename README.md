@@ -1,12 +1,12 @@
 # gpu-setup
 
-Bootstrap and configure bare-metal GPU server instances from a fresh Ubuntu 24.04 install.
+Bootstrap and configure bare-metal GPU server instances from a fresh Ubuntu install.
 
 ## Assumptions
 
 The **only** things assumed in advance:
 
-- OS: **Ubuntu 24.04 LTS**
+- OS: **Ubuntu 22.04 LTS or later** (developed on 24.04; tested on 22.04)
 - One or more datacenter GPUs installed (NVIDIA or AMD)
 - Root / sudo access
 
