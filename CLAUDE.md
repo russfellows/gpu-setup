@@ -7,7 +7,7 @@ no unapproved code edits, no unauthorized pushes) still applies on top.
 ## What this repo is
 
 Bootstrap and benchmark tooling for bare-metal GPU servers running
-Ubuntu 24.04. Two halves:
+Ubuntu 22.04 LTS or later (developed on 24.04, tested on 22.04). Two halves:
 
 1. **`scripts/`** — gets a fresh host from "stock Ubuntu install" to "ready
    to run containerized inference." Vendor-aware (NVIDIA / AMD), all
@@ -20,8 +20,12 @@ Ubuntu 24.04. Two halves:
 
 ## Runbook for a fresh GPU box
 
-Assume: bare-metal or cloud bare-metal Ubuntu 24.04, GPUs physically present,
+Assume: bare-metal or cloud bare-metal Ubuntu 22.04+, GPUs physically present,
 no software installed beyond the OS.
+
+> **Box already set up?** If the GPU stack, Docker, and HF env are already
+> configured, skip to step 9 and see `docs/QUICKSTART.md` for verification
+> commands and the "am I ready?" checklist.
 
 ```bash
 # 1. Clone (or copy) the repo onto the target.
@@ -121,6 +125,30 @@ When the user asks for a new recipe:
 
 `/mnt/data` is scratch — it can disappear. Sweep results are valuable and
 live with the user. The harness already does this; don't change it.
+
+## Environment variables agents must know about
+
+These are set system-wide by `scripts/common/setup_hf_env.sh` via
+`/etc/profile.d/huggingface.sh`. They must be present in the user's shell
+session before any recipe runs.
+
+| Variable | Value | Purpose |
+|---|---|---|
+| `HF_HOME` | `/mnt/data/huggingface` | Root of the shared HF model cache (mounted into containers) |
+| `HUGGINGFACE_HUB_CACHE` | `$HF_HOME/hub` | Where `hf download` stores model files |
+| `HF_TOKEN_PATH` | `$HOME/.cache/huggingface/token` | Per-user token file written by `hf auth login` |
+| `HF_TOKEN` | read from `HF_TOKEN_PATH` | Forwarded by the harness into containers for gated model access |
+| `HF_XET_HIGH_PERFORMANCE` | `1` | Enables fast XET protocol for large model downloads |
+
+**When helping a user verify their environment**, check all five. The most
+common problems: `HF_HOME` is wrong (profile not sourced), or `HF_TOKEN` is
+empty (never ran `hf auth login`, or ran it in a different session).
+
+To verify quickly:
+```bash
+echo "HF_HOME=$HF_HOME  HF_TOKEN=$(echo $HF_TOKEN | head -c 10)..."
+hf whoami
+```
 
 ## Common pitfalls
 
