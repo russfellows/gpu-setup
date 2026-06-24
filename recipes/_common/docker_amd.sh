@@ -9,8 +9,8 @@
 AMD_DOCKER_FLAGS=(
   --device=/dev/kfd
   --device=/dev/dri
-  --group-add=video
-  --group-add=render
+  --group-add="$(getent group video  | cut -d: -f3)"
+  --group-add="$(getent group render | cut -d: -f3)"
   --ipc=host
   --network=host
   --cap-add=SYS_PTRACE
