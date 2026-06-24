@@ -205,6 +205,7 @@ server_args = [
   "--reasoning-parser", "kimi_k2",
   "--tool-call-parser", "kimi_k2",
   "--kv-cache-dtype", "fp8",
+  "--safetensors-load-strategy", "prefetch",
   "--max-cudagraph-capture-size", "2048",
   "--stream-interval", "20",
   "--compilation-config", '{"pass_config":{"fuse_allreduce_rms":true}}',
