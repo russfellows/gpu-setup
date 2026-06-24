@@ -1,6 +1,11 @@
 # gpu-setup
 
-Bootstrap and configure bare-metal GPU server instances from a fresh Ubuntu install.
+Bootstrap and configure bare-metal GPU server instances from a fresh Ubuntu install,
+then run reproducible LLM inference benchmarks across AMD and NVIDIA hardware.
+
+> **Box already set up and just want to run benchmarks?**
+> Skip to **[docs/QUICKSTART.md](docs/QUICKSTART.md)** — it covers environment
+> verification, HF authentication, model downloads, and running your first recipe.
 
 ## Assumptions
 
@@ -39,6 +44,7 @@ recipes/                     # benchmark sweep recipes — see recipes/README.md
   kimi-k2.6/                 # Moonshot Kimi-K2.6 (MXFP4 on AMD, NVFP4 on NVIDIA)
   qwen3-next-80b/            # Qwen3-Next-80B-A3B-Instruct-FP8
 docs/
+  QUICKSTART.md              # new-teammate guide: verify env, check HF token, run first recipe
   archive/                   # original drafts kept for reference
 ```
 

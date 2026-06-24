@@ -52,7 +52,7 @@ The first time `amd_vllm` runs, the harness builds
 `gpu-setup/vllm-rocm-kimi-k2-6-mxfp4:local` from
 [Dockerfile.amd_vllm](Dockerfile.amd_vllm). The Dockerfile pins:
 
-- Base image: `vllm/vllm-openai-rocm:nightly-d0975a4b50140a9d953f00955a1cbb2a4945edef`
+- Base image: `vllm/vllm-openai-rocm:nightly-04c2a8deac44fdb1ca3e2b5ec3e6bf16f3f6a914`
 - AITER commit (for the CSV fetch): `78ef4be9d621e3660c89cfb611679fb12fe10ed4`
 
 Both pins matter for reproducibility — update them deliberately when you
