@@ -139,7 +139,11 @@ run_sweep() {
   local -a TORCH_CACHE_MOUNT=(-v "${TORCH_CACHE_HOST}:/root/.cache/torch")
 
   local -a HF_TOKEN_ENV=()
-  [ -n "${HF_TOKEN:-}" ] && HF_TOKEN_ENV=(-e "HF_TOKEN=${HF_TOKEN}")
+  local _hf_token="${HF_TOKEN:-}"
+  if [ -z "$_hf_token" ] && [ -f "${HF_TOKEN_PATH:-$HOME/.cache/huggingface/token}" ]; then
+    _hf_token="$(cat "${HF_TOKEN_PATH:-$HOME/.cache/huggingface/token}")"
+  fi
+  [ -n "$_hf_token" ] && HF_TOKEN_ENV=(-e "HF_TOKEN=${_hf_token}")
 
   # ---------- Extra files mount: RECIPE_DIR/<file> -> /recipe/<basename> ----------
   local -a FILE_MOUNTS=()
@@ -353,6 +357,7 @@ EOF
   # invoking user so they can read/delete results without sudo.
   local _invoke_user="${SUDO_USER:-$USER}"
   chown -R "$_invoke_user" "$RESULTS_DIR" 2>/dev/null \
+    || sudo chown -R "$_invoke_user" "$RESULTS_DIR" 2>/dev/null \
     || warn "chown of $RESULTS_DIR failed — result files may be root-owned."
 
   echo
