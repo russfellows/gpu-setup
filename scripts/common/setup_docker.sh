@@ -23,7 +23,7 @@ FORCE_REINSTALL="${FORCE_REINSTALL:-0}"
 [ "$ASSUME_YES" = "1" ] && export DEBIAN_FRONTEND=noninteractive
 
 need_root
-require_ubuntu_2404
+require_ubuntu_2204_plus
 
 REAL_USER="$(real_user)"
 
