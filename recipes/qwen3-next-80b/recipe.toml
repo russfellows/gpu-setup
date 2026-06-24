@@ -151,6 +151,7 @@ server_args = [
   "--gpu-memory-utilization", "0.95",
   "--no-enable-prefix-caching",
   "--async-scheduling",
+  "--safetensors-load-strategy", "prefetch",
   "--performance-mode", "throughput",
   "--compilation-config",
   '{"pass_config":{"fuse_allreduce_rms":true,"eliminate_noops":true}}',
