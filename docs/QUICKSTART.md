@@ -101,16 +101,18 @@ The CLI is installed to `~/.local/bin` by `uv tool install huggingface_hub`.
 
 **`HF_TOKEN` for recipes.** Recipes forward the `HF_TOKEN` environment
 variable into containers so the model download inside the container is
-authenticated. The harness reads the token from `$HF_TOKEN_PATH` at runtime:
+authenticated. The profile script reads `$HF_TOKEN_PATH` and exports
+`HF_TOKEN` automatically on every new login shell. The harness also reads
+`HF_TOKEN_PATH` directly as a fallback if `HF_TOKEN` is not set in the
+current session.
 
 ```bash
-# The token is auto-exported by /etc/profile.d/huggingface.sh if HF_TOKEN_PATH exists.
-# Verify it is set in your current session:
+# Verify the token is set in your current session:
 echo $HF_TOKEN | head -c 10    # should print "hf_..." (first 10 chars)
 ```
 
-If `HF_TOKEN` is empty, the profile script couldn't read the token file.
-Re-authenticate with `hf auth login` and open a new shell.
+If `HF_TOKEN` is empty, either open a new shell (to re-source the profile)
+or re-authenticate with `hf auth login`.
 
 ### 1e. Storage
 

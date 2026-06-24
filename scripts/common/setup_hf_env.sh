@@ -70,6 +70,9 @@ export HF_XET_HIGH_PERFORMANCE=1
 # Each user's token lives in their own home dir (where `hf auth login` puts
 # it). HF_TOKEN_PATH tells huggingface_hub to look there rather than $HF_HOME.
 export HF_TOKEN_PATH="$HOME/.cache/huggingface/token"
+if [ -f "\$HF_TOKEN_PATH" ]; then
+    export HF_TOKEN="\$(cat "\$HF_TOKEN_PATH")"
+fi
 
 # umask 002: new files are group-writable (664) and dirs are group-writable
 # (775), so any user's model downloads are readable and usable by all users

@@ -60,5 +60,5 @@ run_bench() {
   fi
 
   log "Bench: ISL=$ISL OSL=$OSL CONC=$CONC -> $RESULT_FILENAME"
-  docker exec "$CONTAINER_NAME" "${cmd[@]}"
+  docker exec --user "$(id -u):$(id -g)" "$CONTAINER_NAME" "${cmd[@]}"
 }
