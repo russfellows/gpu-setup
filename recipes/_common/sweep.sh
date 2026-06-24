@@ -184,7 +184,7 @@ run_sweep() {
     else
       log "Building $IMAGE from $df_path ..."
       docker build -f "$df_path" -t "$IMAGE" \
-        "${EXTRA_BUILD_ARGS[@]:-}" \
+        ${EXTRA_BUILD_ARGS[@]+"${EXTRA_BUILD_ARGS[@]}"} \
         "$ctx" \
         || { err "Build failed."; return 3; }
     fi
