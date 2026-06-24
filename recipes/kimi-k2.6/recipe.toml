@@ -55,6 +55,7 @@ server_args = [
   "--attention-backend", "ROCM_AITER_MLA",
   "--block-size", "1",
   "--kv-cache-dtype", "fp8",
+  "--safetensors-load-strategy", "prefetch",
   "--compilation-config",
   '{"pass_config":{"fuse_allreduce_rms":true,"eliminate_noops":true,"fuse_rope_kvcache_cat_mla":true},"custom_ops":["none","+rms_norm"],"compile_ranges_endpoints":[64],"cudagraph_mode":"full_and_piecewise","use_inductor_graph_partition":true}',
 ]
@@ -104,6 +105,7 @@ server_args = [
   "--attention-backend", "ROCM_AITER_MLA",
   "--block-size", "1",
   "--kv-cache-dtype", "fp8",
+  "--safetensors-load-strategy", "prefetch",
   "--compilation-config",
   '{"pass_config":{"fuse_allreduce_rms":true,"eliminate_noops":true,"fuse_rope_kvcache_cat_mla":true},"custom_ops":["none","+rms_norm"],"compile_ranges_endpoints":[64],"cudagraph_mode":"full_and_piecewise","use_inductor_graph_partition":true}',
 ]
@@ -154,6 +156,7 @@ server_args = [
   "--attention-backend", "ROCM_AITER_MLA",
   "--block-size", "1",
   "--kv-cache-dtype", "fp8",
+  "--safetensors-load-strategy", "prefetch",
   "--compilation-config",
   '{"pass_config":{"fuse_allreduce_rms":true,"eliminate_noops":true,"fuse_rope_kvcache_cat_mla":true},"custom_ops":["none","+rms_norm"],"compile_ranges_endpoints":[64],"cudagraph_mode":"full_and_piecewise","use_inductor_graph_partition":true}',
 ]

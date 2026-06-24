@@ -45,6 +45,7 @@ server_args = [
   "--gpu-memory-utilization", "0.8",
   "--no-enable-prefix-caching",
   "--async-scheduling",
+  "--safetensors-load-strategy", "prefetch",
   "--compilation-config",
   '{"cudagraph_mode":"FULL_AND_PIECEWISE","custom_ops":["-rms_norm","-silu_and_mul","-quant_fp8"],"pass_config":{"fuse_norm_quant":true,"fuse_allreduce_rms":false}}',
 ]
@@ -87,6 +88,7 @@ server_args = [
   "--gpu-memory-utilization", "0.8",
   "--no-enable-prefix-caching",
   "--async-scheduling",
+  "--safetensors-load-strategy", "prefetch",
   "--compilation-config",
   '{"cudagraph_mode":"FULL_AND_PIECEWISE","custom_ops":["-rms_norm","-silu_and_mul","-quant_fp8"],"pass_config":{"fuse_norm_quant":true,"fuse_allreduce_rms":false}}',
 ]
