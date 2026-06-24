@@ -43,7 +43,10 @@ list_recipes() {
     [ -f "$toml" ] || continue
     local variants
     variants=$(python3 -c "
-import tomllib, sys
+try:
+    import tomllib
+except ImportError:
+    import tomli as tomllib
 with open('$toml','rb') as f: d = tomllib.load(f)
 print(' '.join(sorted(d.get('variants',{}).keys())))
 ") || variants="(parse error)"

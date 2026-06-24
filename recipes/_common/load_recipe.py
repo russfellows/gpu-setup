@@ -43,7 +43,13 @@ Schema (see recipes/README.md for full docs):
 import json
 import shlex
 import sys
-import tomllib
+try:
+    import tomllib
+except ImportError:
+    try:
+        import tomli as tomllib  # backport for Python < 3.11
+    except ImportError:
+        sys.exit("tomllib not found. Install tomli: pip install tomli  (or use Python >= 3.11)")
 from pathlib import Path
 
 

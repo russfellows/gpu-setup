@@ -29,7 +29,7 @@ ready_timeout_s    = 1800
 [variants.amd_vllm]
 vendor  = "amd"
 stack   = "vllm"
-image   = "vllm/vllm-openai-rocm:nightly-d8218b1ee7db3e7582e0151e942d17963a1e3e13"
+image   = "vllm/vllm-openai-rocm:nightly-04c2a8deac44fdb1ca3e2b5ec3e6bf16f3f6a914"
 port    = 8000
 
 server_entrypoint = "vllm serve"
@@ -71,7 +71,7 @@ VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS         = "1800"
 [variants.amd_vllm_numa]
 vendor  = "amd"
 stack   = "vllm"
-image   = "vllm/vllm-openai-rocm:nightly-d8218b1ee7db3e7582e0151e942d17963a1e3e13"
+image   = "vllm/vllm-openai-rocm:nightly-04c2a8deac44fdb1ca3e2b5ec3e6bf16f3f6a914"
 port    = 8000
 
 server_entrypoint = "vllm serve"
