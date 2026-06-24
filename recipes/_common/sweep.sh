@@ -91,7 +91,7 @@ run_sweep() {
   : "${SWEEP_TP:=${SWEEP_TP_DEFAULT:-1}}"
   : "${SWEEP_ISL_OSL:=${SWEEP_ISL_OSL_DEFAULT:-1024,1024}}"
   : "${SWEEP_CONC:=${SWEEP_CONC_DEFAULT:-4 8 16 32 64 128 256}}"
-  : "${RANDOM_RANGE_RATIO:=1.0}"
+  : "${RANDOM_RANGE_RATIO:=0.9}"
   : "${READY_MARKER:=$(_default_ready_marker "$STACK")}"
   : "${READY_TIMEOUT_S:=1800}"
   : "${BENCH_TOOL:=$(_default_bench_tool "$STACK")}"
