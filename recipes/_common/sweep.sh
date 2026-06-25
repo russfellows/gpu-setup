@@ -359,8 +359,9 @@ EOF
   # writes result files as uid 0. Chown the entire results dir back to the
   # invoking user so they can read/delete results without sudo.
   local _invoke_user="${SUDO_USER:-$USER}"
-  chown -R "$_invoke_user" "$RESULTS_DIR" 2>/dev/null \
-    || sudo chown -R "$_invoke_user" "$RESULTS_DIR" 2>/dev/null \
+  local _invoke_group; _invoke_group="$(id -gn "$_invoke_user" 2>/dev/null || echo users)"
+  chown -R "$_invoke_user:$_invoke_group" "$RESULTS_DIR" 2>/dev/null \
+    || sudo chown -R "$_invoke_user:$_invoke_group" "$RESULTS_DIR" 2>/dev/null \
     || warn "chown of $RESULTS_DIR failed — result files may be root-owned."
 
   echo
