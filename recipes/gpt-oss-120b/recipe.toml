@@ -1,6 +1,8 @@
 # Recipe: openai/gpt-oss-120b
 #
-# Two variants: AMD via ATOM, NVIDIA via TensorRT-LLM. Both serve an
+# Three variants: AMD via ATOM, NVIDIA via TensorRT-LLM, NVIDIA via vLLM.
+# The vLLM variant was added for environments where TRT-LLM is unavailable
+# (e.g. running natively inside a container). Both NVIDIA variants serve an
 # OpenAI-compatible endpoint on port 8000 and are exercised by the
 # standard `vllm bench serve` client (ATOM variant uses its own
 # atom.benchmarks.benchmark_serving with the same flags).
@@ -22,6 +24,33 @@ sweep_isl_osl  = ["1024,1024", "1024,8192", "8192,1024"]
 sweep_conc     = [4, 8, 16, 32, 64, 128, 256]
 random_range_ratio = 0.8
 ready_timeout_s    = 1800
+
+
+# ----- NVIDIA / vLLM ---------------------------------------------------------
+[variants.nvidia_vllm]
+vendor  = "nvidia"
+stack   = "vllm"
+image   = "vllm/vllm-openai:v0.22.1"
+port    = 8000
+
+server_entrypoint = "vllm serve"
+server_args = [
+  "openai/gpt-oss-120b",
+  "--host", "0.0.0.0",
+  "--port", "8000",
+  "--tensor-parallel-size", "@TP@",
+  "--kv-cache-dtype", "fp8",
+  "--max-model-len", "15360",
+  "--max-num-seqs", "256",
+  "--gpu-memory-utilization", "0.90",
+  "--safetensors-load-strategy", "prefetch",
+  "--compilation-config",
+  '{"pass_config":{"fuse_allreduce_rms":true,"eliminate_noops":true}}',
+]
+
+[variants.nvidia_vllm.env]
+TORCH_CUDA_ARCH_LIST = "10.0"
+PYTHONNOUSERSITE     = "1"
 
 
 # ----- AMD / ATOM ------------------------------------------------------------

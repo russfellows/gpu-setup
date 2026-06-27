@@ -98,6 +98,7 @@ run_sweep() {
   : "${PORT:=8000}"
   : "${DRY_RUN:=0}"
   HOST="${HOST:-localhost}"
+  NATIVE="${NATIVE:-0}"
 
   IFS=$' \t\n' read -r -a _TP_ARR    <<< "$SWEEP_TP"
   IFS=$' \t\n' read -r -a _ISLOSL_ARR<<< "$SWEEP_ISL_OSL"
@@ -185,34 +186,38 @@ run_sweep() {
   fi
 
   # ---------- Build (optional) or pull ----------
-  if [ -n "${EXTRA_BUILD_DOCKERFILE:-}" ]; then
-    local df_path="${RECIPE_DIR}/${EXTRA_BUILD_DOCKERFILE}"
-    local ctx="${RECIPE_DIR}/${EXTRA_BUILD_CONTEXT:-.}"
-    if [ ! -f "$df_path" ]; then
-      err "Dockerfile not found: $df_path"
-      return 2
-    fi
-    if [ "$DRY_RUN" = "1" ]; then
-      log "(dry-run) would build $IMAGE from $df_path"
-      if [ -n "${EXTRA_BUILD_ARGS+x}" ] && [ "${#EXTRA_BUILD_ARGS[@]}" -gt 0 ]; then
-        log "(dry-run) build args: ${EXTRA_BUILD_ARGS[*]}"
+  if [ "$NATIVE" = "0" ]; then
+    if [ -n "${EXTRA_BUILD_DOCKERFILE:-}" ]; then
+      local df_path="${RECIPE_DIR}/${EXTRA_BUILD_DOCKERFILE}"
+      local ctx="${RECIPE_DIR}/${EXTRA_BUILD_CONTEXT:-.}"
+      if [ ! -f "$df_path" ]; then
+        err "Dockerfile not found: $df_path"
+        return 2
       fi
-    elif docker image inspect "$IMAGE" >/dev/null 2>&1; then
-      ok "Built image already present: $IMAGE (skipping rebuild)"
+      if [ "$DRY_RUN" = "1" ]; then
+        log "(dry-run) would build $IMAGE from $df_path"
+        if [ -n "${EXTRA_BUILD_ARGS+x}" ] && [ "${#EXTRA_BUILD_ARGS[@]}" -gt 0 ]; then
+          log "(dry-run) build args: ${EXTRA_BUILD_ARGS[*]}"
+        fi
+      elif docker image inspect "$IMAGE" >/dev/null 2>&1; then
+        ok "Built image already present: $IMAGE (skipping rebuild)"
+      else
+        log "Building $IMAGE from $df_path ..."
+        docker build -f "$df_path" -t "$IMAGE" \
+          ${EXTRA_BUILD_ARGS[@]+"${EXTRA_BUILD_ARGS[@]}"} \
+          "$ctx" \
+          || { err "Build failed."; return 3; }
+      fi
     else
-      log "Building $IMAGE from $df_path ..."
-      docker build -f "$df_path" -t "$IMAGE" \
-        ${EXTRA_BUILD_ARGS[@]+"${EXTRA_BUILD_ARGS[@]}"} \
-        "$ctx" \
-        || { err "Build failed."; return 3; }
+      if [ "$DRY_RUN" = "1" ]; then
+        log "(dry-run) would ensure image present: $IMAGE"
+      elif ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
+        log "Pulling $IMAGE ..."
+        docker pull "$IMAGE" || { err "Pull failed."; return 3; }
+      fi
     fi
   else
-    if [ "$DRY_RUN" = "1" ]; then
-      log "(dry-run) would ensure image present: $IMAGE"
-    elif ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
-      log "Pulling $IMAGE ..."
-      docker pull "$IMAGE" || { err "Pull failed."; return 3; }
-    fi
+    log "Native mode — skipping image pull/build; running $STACK directly on host."
   fi
 
   # ---------- Plan ----------
@@ -225,6 +230,7 @@ run_sweep() {
  Model       : $MODEL_ID
  Variant     : $VARIANT_NAME ($VENDOR / $STACK)
  Image       : $IMAGE
+ Mode        : $([ "$NATIVE" = "1" ] && echo "native (no container — $STACK direct on host)" || echo "docker")
  TP sizes    : ${_TP_ARR[*]}
  ISL,OSL     : ${_ISLOSL_ARR[*]}
  Concurrency : ${_CONC_ARR[*]}
@@ -268,7 +274,7 @@ EOF
   PROV_SWEEP_ISL_OSL="${_ISLOSL_ARR[*]}" \
   PROV_SWEEP_CONC="${_CONC_ARR[*]}" \
   PROV_RECIPE_TOML="${RECIPE_TOML:-${RECIPE_DIR}/recipe.toml}" \
-  python3 "${_SWEEP_DIR}/write_provenance.py" >/dev/null \
+  uv run --no-project "${_SWEEP_DIR}/write_provenance.py" >/dev/null \
     && ok "Wrote ${RESULTS_DIR}/provenance.json" \
     || warn "Provenance write failed (continuing)."
   fi
@@ -293,42 +299,79 @@ EOF
 
         log "---- Run: tp=$TP isl=$ISL osl=$OSL conc=$CONC ----"
 
-        docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
-        # Guarantee cleanup even on SIGINT/SIGTERM or script exit.
-        # shellcheck disable=SC2064  # expansion at trap-set time is intentional: captures current loop value of CONTAINER_NAME
-        trap "docker rm -f '$CONTAINER_NAME' >/dev/null 2>&1 || true" EXIT INT TERM
+        local _native_server_pid=""
+        if [ "$NATIVE" = "0" ]; then
+          docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
+          # Guarantee cleanup even on SIGINT/SIGTERM or script exit.
+          # shellcheck disable=SC2064  # expansion at trap-set time is intentional
+          trap "docker rm -f '$CONTAINER_NAME' >/dev/null 2>&1 || true" EXIT INT TERM
 
-        # Launch detached (no --rm: we need to capture logs after exit).
-        docker run -d --name "$CONTAINER_NAME" \
-          "${VENDOR_FLAGS[@]}" \
-          "${HF_MOUNT[@]}" \
-          "${TORCH_CACHE_MOUNT[@]}" \
-          "${FILE_MOUNTS[@]}" \
-          -v "${RESULTS_DIR}:/results" \
-          "${HF_TOKEN_ENV[@]}" \
-          ${EXTRA_DOCKER_ENV[@]+"${EXTRA_DOCKER_ENV[@]}"} \
-          ${EXTRA_DOCKER_FLAGS[@]+"${EXTRA_DOCKER_FLAGS[@]}"} \
-          --entrypoint=/bin/bash \
-          "$IMAGE" -lc "$_SRV_CMD_STR" \
-          >/dev/null
+          # Launch detached (no --rm: we need to capture logs after exit).
+          docker run -d --name "$CONTAINER_NAME" \
+            "${VENDOR_FLAGS[@]}" \
+            "${HF_MOUNT[@]}" \
+            "${TORCH_CACHE_MOUNT[@]}" \
+            "${FILE_MOUNTS[@]}" \
+            -v "${RESULTS_DIR}:/results" \
+            "${HF_TOKEN_ENV[@]}" \
+            ${EXTRA_DOCKER_ENV[@]+"${EXTRA_DOCKER_ENV[@]}"} \
+            ${EXTRA_DOCKER_FLAGS[@]+"${EXTRA_DOCKER_FLAGS[@]}"} \
+            --entrypoint=/bin/bash \
+            "$IMAGE" -lc "$_SRV_CMD_STR" \
+            >/dev/null
+        else
+          # Native mode: extract KEY=VAL pairs from EXTRA_DOCKER_ENV (-e KEY=VAL ...).
+          local -a _native_env=()
+          local _i=0
+          while [ "$_i" -lt "${#EXTRA_DOCKER_ENV[@]}" ]; do
+            if [ "${EXTRA_DOCKER_ENV[$_i]}" = "-e" ]; then
+              _i=$(( _i + 1 ))
+              _native_env+=("${EXTRA_DOCKER_ENV[$_i]}")
+            fi
+            _i=$(( _i + 1 ))
+          done
+          # Launch server via uv so VIRTUAL_ENV is respected.
+          env "${_native_env[@]+"${_native_env[@]}"}" \
+              HF_TOKEN="${_hf_token:-}" \
+              uv run --no-project bash -c "$_SRV_CMD_STR" > "$LOG_FILE" 2>&1 &
+          _native_server_pid=$!
+          # shellcheck disable=SC2064
+          trap "kill '$_native_server_pid' 2>/dev/null; wait '$_native_server_pid' 2>/dev/null || true" EXIT INT TERM
+          log "Native server launched (PID $_native_server_pid) — logging to $LOG_FILE"
+        fi
 
         # Wait for ready marker.
         local waited=0
         local ready=0
         while [ "$waited" -lt "$READY_TIMEOUT_S" ]; do
-          if docker logs "$CONTAINER_NAME" 2>&1 | grep -q "$READY_MARKER"; then
-            ready=1; break
-          fi
-          if ! docker ps -q --filter "name=^${CONTAINER_NAME}$" | grep -q .; then
-            err "Server container exited before becoming ready."
-            break
+          if [ "$NATIVE" = "0" ]; then
+            if docker logs "$CONTAINER_NAME" 2>&1 | grep -q "$READY_MARKER"; then
+              ready=1; break
+            fi
+            if ! docker ps -q --filter "name=^${CONTAINER_NAME}$" | grep -q .; then
+              err "Server container exited before becoming ready."
+              break
+            fi
+          else
+            if grep -q "$READY_MARKER" "$LOG_FILE" 2>/dev/null; then
+              ready=1; break
+            fi
+            if ! kill -0 "$_native_server_pid" 2>/dev/null; then
+              err "Server process $_native_server_pid exited before becoming ready."
+              break
+            fi
           fi
           sleep 10; waited=$((waited + 10))
         done
         if [ "$ready" -ne 1 ]; then
           err "Server failed to reach '$READY_MARKER' in ${READY_TIMEOUT_S}s."
-          docker logs "$CONTAINER_NAME" > "$LOG_FILE" 2>&1 || true
-          docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
+          if [ "$NATIVE" = "0" ]; then
+            docker logs "$CONTAINER_NAME" > "$LOG_FILE" 2>&1 || true
+            docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
+          else
+            kill "$_native_server_pid" 2>/dev/null || true
+            wait "$_native_server_pid" 2>/dev/null || true
+          fi
           echo "$TP,$ISL,$OSL,$CONC,server_timeout," >> "$SUMMARY"
           rc_total=$((rc_total + 1))
           continue
@@ -349,8 +392,13 @@ EOF
           rc_total=$((rc_total + 1))
         fi
 
-        docker logs "$CONTAINER_NAME" > "$LOG_FILE" 2>&1 || true
-        docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
+        if [ "$NATIVE" = "0" ]; then
+          docker logs "$CONTAINER_NAME" > "$LOG_FILE" 2>&1 || true
+          docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
+        else
+          kill "$_native_server_pid" 2>/dev/null || true
+          wait "$_native_server_pid" 2>/dev/null || true
+        fi
       done
     done
   done

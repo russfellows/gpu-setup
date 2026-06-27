@@ -1,4 +1,10 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#   "tomli; python_version < '3.11'",
+# ]
+# ///
 """
 Recipe loader. Reads a recipe TOML and prints bash assignments that
 run_recipe.sh evals to populate the variables that sweep.sh expects.

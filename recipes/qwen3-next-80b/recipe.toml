@@ -133,6 +133,9 @@ server_args = [
 
 
 # ----- NVIDIA / vLLM ---------------------------------------------------------
+# Max TP = 4. FP8 block quantization uses block_k=128; at TP=8 the weight
+# input_size_per_partition drops to 64 (< block_k), causing a ValueError on
+# startup. The recipe-level sweep_tp=[1,2,4] enforces this constraint.
 [variants.nvidia_vllm]
 vendor  = "nvidia"
 stack   = "vllm"

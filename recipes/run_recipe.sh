@@ -13,17 +13,21 @@
 #   --shapes "1024,1024 8192,1024"   ISL,OSL pairs (space separated)
 #   --conc "4 8 16 32"               Concurrencies (comma or space)
 #   --dry-run                        Print the plan and exit
+#   --env ENV                        Runtime environment profile (auto-detected if omitted)
+#                                    Profiles: baremetal | container | runpod
 #   --results-dir PATH               Override results directory
 #
 # Examples:
 #   ./run_recipe.sh gpt-oss-120b amd_atom
 #   ./run_recipe.sh qwen3-next-80b nvidia_vllm --tp 4 --shapes "1000,100 5000,500"
+#   ./run_recipe.sh qwen3-next-80b nvidia_vllm --env runpod --dry-run
 #   ./run_recipe.sh --list
 # ==============================================================================
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ENV_DIR="${SCRIPT_DIR}/../environments"
 # shellcheck source=../scripts/lib/common.sh
 source "${SCRIPT_DIR}/../scripts/lib/common.sh"
 
@@ -42,7 +46,7 @@ list_recipes() {
     local toml="${dir}recipe.toml"
     [ -f "$toml" ] || continue
     local variants
-    variants=$(python3 -c "
+    variants=$(uv run --no-project python -c "
 try:
     import tomllib
 except ImportError:
@@ -82,13 +86,14 @@ fi
 
 # CLI overrides become env vars consumed by sweep.sh.
 export DRY_RUN="${DRY_RUN:-0}"
-_TP=""; _SHAPES=""; _CONC=""; _RESULTS=""
+_TP=""; _SHAPES=""; _CONC=""; _RESULTS=""; _ENV_OVERRIDE=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --tp)          _TP="${2//,/ }"; shift 2 ;;
     --shapes)      _SHAPES="$2"; shift 2 ;;
     --conc)        _CONC="${2//,/ }"; shift 2 ;;
     --dry-run)     export DRY_RUN=1; shift ;;
+    --env)         _ENV_OVERRIDE="$2"; shift 2 ;;
     --results-dir) _RESULTS="$2"; shift 2 ;;
     *) err "Unknown option: $1"; usage; exit 1 ;;
   esac
@@ -98,9 +103,35 @@ done
 [ -n "$_CONC" ]    && export SWEEP_CONC="$_CONC"
 [ -n "$_RESULTS" ] && export RESULTS_DIR="$_RESULTS"
 
+# ---------- Environment profile ----------
+# Determines NATIVE, SHARED_ROOT, HF_HOME etc. for the target runtime.
+# Explicit --env overrides auto-detection; DETECTED_ENV can be pre-set too.
+_load_env_profile() {
+  local name="$1"
+  local profile="${ENV_DIR}/${name}.sh"
+  if [ ! -f "$profile" ]; then
+    err "Unknown environment '${name}'. Available: $(ls "${ENV_DIR}"/*.sh 2>/dev/null | xargs -n1 basename | sed 's/\.sh$//' | tr '\n' ' ')"
+    exit 1
+  fi
+  # shellcheck disable=SC1090
+  source "$profile"
+  log "Environment: ${name} (NATIVE=${NATIVE:-0}, SHARED_ROOT=${SHARED_ROOT:-/mnt/data})"
+}
+
+if [ -n "$_ENV_OVERRIDE" ]; then
+  _load_env_profile "$_ENV_OVERRIDE"
+elif [ -n "${DETECTED_ENV:-}" ]; then
+  _load_env_profile "$DETECTED_ENV"
+else
+  # Auto-detect.
+  # shellcheck source=../environments/detect.sh
+  source "${ENV_DIR}/detect.sh"
+  _load_env_profile "$DETECTED_ENV"
+fi
+
 log "Loading recipe: $MODEL / $VARIANT"
 # Pull bash assignments from the TOML into this shell.
-RECIPE_VARS=$(python3 "$LOADER" "$RECIPE_TOML" "$VARIANT")
+RECIPE_VARS=$(uv run --no-project "$LOADER" "$RECIPE_TOML" "$VARIANT")
 # shellcheck disable=SC1090
 eval "$RECIPE_VARS"
 
