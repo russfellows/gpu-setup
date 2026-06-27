@@ -36,6 +36,15 @@ run_bench() {
       ;;
   esac
 
+  # In docker mode results land at /results (mounted from $RESULTS_DIR).
+  # In native mode we write directly to $RESULTS_DIR on the host.
+  local _result_dir
+  if [ "${NATIVE:-0}" = "1" ]; then
+    _result_dir="$RESULTS_DIR"
+  else
+    _result_dir="/results"
+  fi
+
   # shellcheck disable=SC2054  # commas are inside argument values, not array separators
   cmd+=(
     --model="$MODEL_ID"
@@ -51,7 +60,7 @@ run_bench() {
     --request-rate=inf
     --ignore-eos
     --save-result
-    --result-dir=/results
+    --result-dir="$_result_dir"
     --result-filename="$RESULT_FILENAME"
     --percentile-metrics=ttft,tpot,itl,e2el
     --metric-percentiles=25,50,75,90,95,99
@@ -61,5 +70,9 @@ run_bench() {
   fi
 
   log "Bench: ISL=$ISL OSL=$OSL CONC=$CONC -> $RESULT_FILENAME"
-  docker exec "$CONTAINER_NAME" "${cmd[@]}"
+  if [ "${NATIVE:-0}" = "1" ]; then
+    uv run --no-project "${cmd[@]}"
+  else
+    docker exec "$CONTAINER_NAME" "${cmd[@]}"
+  fi
 }
