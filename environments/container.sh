@@ -36,7 +36,12 @@ export SHARED_ROOT
 : "${HF_HOME:=${SHARED_ROOT}/huggingface}"
 export HF_HOME
 export HUGGINGFACE_HUB_CACHE="${HF_HOME}/hub"
-export HF_XET_HIGH_PERFORMANCE=1
+
+# Disable XET: it stores blobs as CAS chunks requiring reconstruction on read,
+# which fails intermittently ("Background writer channel closed") during model
+# loading. Standard HTTP download writes plain safetensors files vLLM reads directly.
+export HF_HUB_DISABLE_XET=1
+unset HF_XET_HIGH_PERFORMANCE
 
 # Ensure /mnt/data resolves to SHARED_ROOT so scripts that hardcode /mnt/data
 # keep working without modification.
