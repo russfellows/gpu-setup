@@ -47,6 +47,7 @@ Schema (see recipes/README.md for full docs):
     tag        = "local/<model>-<variant>:latest"      # used as IMAGE if build present
 """
 import json
+import os
 import shlex
 import sys
 try:
@@ -172,11 +173,15 @@ def main() -> int:
     emit_array("SERVER_CMD", server_cmd)
 
     # ---- Environment ----
+    # Expand ${VAR} / $VAR references in values so recipes can write
+    # ${SHARED_ROOT}/vllm_cache and have it resolve to the platform-specific
+    # path set by the environment profile (runpod.sh / baremetal.sh / etc.)
+    # that was sourced by run_recipe.sh before load_recipe.py runs.
     env = v.get("env", {})
     if env:
         flat = []
         for k, val in env.items():
-            flat += ["-e", f"{k}={val}"]
+            flat += ["-e", f"{k}={os.path.expandvars(str(val))}"]
         emit_array("EXTRA_DOCKER_ENV", flat)
     else:
         print("EXTRA_DOCKER_ENV=()")

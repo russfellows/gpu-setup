@@ -164,9 +164,17 @@ run_sweep() {
   # ---------- Results dir ----------
   local TS
   TS="$(date +%Y%m%d_%H%M%S)"
-  local USER_HOME
-  USER_HOME="$(getent passwd "${SUDO_USER:-$USER}" | cut -d: -f6)"
-  : "${RESULTS_DIR:=${USER_HOME}/results/${MODEL_NAME}/${VARIANT_NAME}/${TS}}"
+  # Default results to /workspace so they survive pod restarts.
+  # Fall back to $HOME only if /workspace isn't a persistent volume.
+  local _results_base
+  if [ -d "/workspace" ] && [ "$(stat -f -c %T /workspace 2>/dev/null || stat -fc %T /workspace 2>/dev/null || echo local)" != "local" ] || [ -f "/workspace/gpu-env.sh" ]; then
+    _results_base="/workspace/results"
+  else
+    local USER_HOME
+    USER_HOME="$(getent passwd "${SUDO_USER:-$USER}" | cut -d: -f6)"
+    _results_base="${USER_HOME}/results"
+  fi
+  : "${RESULTS_DIR:=${_results_base}/${MODEL_NAME}/${VARIANT_NAME}/${TS}}"
   if [ "$DRY_RUN" != "1" ]; then
     mkdir -p "$RESULTS_DIR"
   fi
@@ -331,8 +339,11 @@ EOF
             _i=$(( _i + 1 ))
           done
           # Launch server via uv so VIRTUAL_ENV is respected.
+          # PYTHONUNBUFFERED=1 forces Python to flush stdout/stderr immediately
+          # when writing to a file (not a TTY), so startup logs appear in real time.
           env "${_native_env[@]+"${_native_env[@]}"}" \
               HF_TOKEN="${_hf_token:-}" \
+              PYTHONUNBUFFERED=1 \
               uv run --no-project bash -c "$_SRV_CMD_STR" > "$LOG_FILE" 2>&1 &
           _native_server_pid=$!
           # shellcheck disable=SC2064

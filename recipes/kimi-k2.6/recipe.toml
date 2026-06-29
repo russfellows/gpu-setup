@@ -212,5 +212,7 @@ server_args = [
 ]
 
 [variants.nvidia_vllm.env]
-TORCH_CUDA_ARCH_LIST = "10.0"
-PYTHONNOUSERSITE     = "1"
+TORCH_CUDA_ARCH_LIST    = "10.0"
+PYTHONNOUSERSITE        = "1"
+VLLM_CACHE_ROOT         = "${SHARED_ROOT}/vllm_cache"
+TORCHINDUCTOR_CACHE_DIR = "${SHARED_ROOT}/torch_compile_cache"
