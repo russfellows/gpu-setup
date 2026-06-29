@@ -40,6 +40,19 @@ source "${_SWEEP_DIR}/docker_nvidia.sh"
 # shellcheck source=bench_client.sh
 source "${_SWEEP_DIR}/bench_client.sh"
 
+# Sync any vLLM compile artifacts that landed in the ephemeral home cache
+# to the persistent VLLM_CACHE_ROOT. Called after every native server shutdown
+# so cache is never lost to a pod restart. cp -rn (no-clobber) is safe to
+# call repeatedly — it only copies files that don't already exist at the dest.
+_sync_vllm_cache() {
+  local _src="${HOME}/.cache/vllm"
+  local _dst="${VLLM_CACHE_ROOT:-}"
+  if [ -n "$_dst" ] && [ -d "$_src" ]; then
+    cp -rn "$_src/." "$_dst/" 2>/dev/null || true
+    log "vLLM cache synced to ${_dst}"
+  fi
+}
+
 _default_ready_marker() {
   case "$1" in
     vllm|sglang|atom|trtllm) echo "Application startup complete" ;;
@@ -382,6 +395,7 @@ EOF
           else
             kill "$_native_server_pid" 2>/dev/null || true
             wait "$_native_server_pid" 2>/dev/null || true
+            _sync_vllm_cache
           fi
           echo "$TP,$ISL,$OSL,$CONC,server_timeout," >> "$SUMMARY"
           rc_total=$((rc_total + 1))
@@ -409,6 +423,7 @@ EOF
         else
           kill "$_native_server_pid" 2>/dev/null || true
           wait "$_native_server_pid" 2>/dev/null || true
+          _sync_vllm_cache
         fi
       done
     done

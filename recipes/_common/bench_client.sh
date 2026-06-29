@@ -69,6 +69,17 @@ run_bench() {
     cmd+=("${BENCH_EXTRA_ARGS[@]}")
   fi
 
+  # If the server was launched with --trust-remote-code (e.g. models with
+  # custom tokenizer code), the bench client tokenizer needs it too.
+  # Auto-add it unless already present in BENCH_EXTRA_ARGS.
+  if [[ " ${SERVER_CMD[*]:-} " =~ " --trust-remote-code " ]]; then
+    local _has_trc=0
+    for _a in "${BENCH_EXTRA_ARGS[@]+"${BENCH_EXTRA_ARGS[@]}"}"; do
+      [[ "$_a" == "--trust-remote-code" ]] && _has_trc=1 && break
+    done
+    [ "$_has_trc" -eq 0 ] && cmd+=("--trust-remote-code")
+  fi
+
   log "Bench: ISL=$ISL OSL=$OSL CONC=$CONC -> $RESULT_FILENAME"
   if [ "${NATIVE:-0}" = "1" ]; then
     PYTHONUNBUFFERED=1 uv run --no-project "${cmd[@]}"
