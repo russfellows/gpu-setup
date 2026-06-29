@@ -71,7 +71,7 @@ run_bench() {
 
   log "Bench: ISL=$ISL OSL=$OSL CONC=$CONC -> $RESULT_FILENAME"
   if [ "${NATIVE:-0}" = "1" ]; then
-    uv run --no-project "${cmd[@]}"
+    PYTHONUNBUFFERED=1 uv run --no-project "${cmd[@]}"
   else
     docker exec "$CONTAINER_NAME" "${cmd[@]}"
   fi

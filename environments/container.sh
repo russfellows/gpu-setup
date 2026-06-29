@@ -52,5 +52,12 @@ elif [ -L /mnt/data ] && [ "$(readlink /mnt/data)" != "$SHARED_ROOT" ]; then
   ln -sfn "$SHARED_ROOT" /mnt/data 2>/dev/null || true
 fi
 
+# vLLM compile cache — derived from SHARED_ROOT so it survives pod restarts.
+# Recipes reference these as ${SHARED_ROOT}/vllm_cache (expanded by load_recipe.py),
+# but the server also inherits them from this environment so they apply even
+# when running vllm serve directly outside the recipe harness.
+export VLLM_CACHE_ROOT="${SHARED_ROOT}/vllm_cache"
+export TORCHINDUCTOR_CACHE_DIR="${SHARED_ROOT}/torch_compile_cache"
+
 # Create cache directories if they don't exist yet.
-mkdir -p "${HF_HOME}" "${SHARED_ROOT}/torch_compile_cache" 2>/dev/null || true
+mkdir -p "${HF_HOME}" "${VLLM_CACHE_ROOT}" "${TORCHINDUCTOR_CACHE_DIR}" 2>/dev/null || true
