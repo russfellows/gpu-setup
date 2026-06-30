@@ -228,6 +228,9 @@ For full recipe authoring docs (TOML schema, custom Dockerfile builds,
 runtime-config JSON injection, `extra_files` mounts, `@TP@`/`@ISL@`/`@OSL@`
 /`@CONC@` placeholders) see [recipes/README.md](recipes/README.md).
 
+To turn a results directory (or its downloaded `.tgz`) into an Excel
+summary workbook, see [analysis/README.md](analysis/README.md).
+
 ## Python tooling
 
 Where Python is needed, scripts use [uv](https://github.com/astral-sh/uv) — no
