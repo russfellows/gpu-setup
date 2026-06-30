@@ -30,9 +30,9 @@ fi
 
 n_done=$(find "$RESULTS_DIR" -maxdepth 1 -name '*.json' ! -name 'provenance.json' 2>/dev/null | wc -l)
 
-current_srv=$(grep -F "==== Starting server:" "$LOG_FILE" 2>/dev/null | tail -1)
-current_bench=$(grep -F "---- Bench:" "$LOG_FILE" 2>/dev/null | tail -1)
-last_ok=$(grep -E "^\[OK\]|Sweep complete" "$LOG_FILE" 2>/dev/null | tail -1)
+current_srv=$(grep -F -- "==== Starting server:" "$LOG_FILE" 2>/dev/null | tail -1)
+current_bench=$(grep -F -- "---- Bench:" "$LOG_FILE" 2>/dev/null | tail -1)
+last_ok=$(grep -E -- "^\[OK\]|Sweep complete" "$LOG_FILE" 2>/dev/null | tail -1)
 
 start_epoch=$(date -d "$(stat -c '%y' "$RESULTS_DIR"/provenance.json 2>/dev/null | cut -d. -f1)" +%s 2>/dev/null || echo "")
 now_epoch=$(date +%s)
