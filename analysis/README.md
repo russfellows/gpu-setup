@@ -14,6 +14,9 @@ Excel workbook:
   the bench-client JSON (`vllm bench serve` / ATOM output): throughput,
   TTFT/TPOT/ITL/E2E latency percentiles, token counts, etc. Sorted
   numerically by TP/ISL/OSL/CONC, with a frozen header row and autofilter.
+  With `--split-by-tp`, this becomes one sheet per TP value (`TP=1`,
+  `TP=2`, ...) instead of a single combined sheet — the now-redundant `tp`
+  column is dropped from each per-TP sheet.
 - **Run Info** — flattened `provenance.json`: model, vendor, image ref,
   GPU inventory, host info, and the `gpu-setup` git commit the sweep ran at.
 - **Recipe TOML** — the exact `recipe.toml` snapshot captured at run time.
@@ -27,6 +30,9 @@ uv run analysis/summarize_results.py gpt-oss-120b_20260629_222941.tgz
 
 # explicit output path
 uv run analysis/summarize_results.py gpt-oss-120b_20260629_222941.tgz -o gpt-oss-120b_report.xlsx
+
+# one sheet per TP value instead of a single combined Results sheet
+uv run analysis/summarize_results.py gpt-oss-120b_20260629_222941.tgz --split-by-tp
 ```
 
 If `-o`/`--output` is omitted, the workbook is named

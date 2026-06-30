@@ -20,15 +20,18 @@ Reads the standard gpu-setup results layout (see recipes/README.md):
 and produces a workbook with:
     Results     - one row per (TP, ISL, OSL, CONC) combo, every field from
                   the bench-client JSON (vllm bench serve / atom output).
+                  With --split-by-tp, this becomes one sheet per TP value
+                  ("TP=1", "TP=2", ...) instead of a single combined sheet.
     Run Info    - provenance.json metadata (model, vendor, image, GPUs, git
                   commit, sweep matrix).
     Recipe TOML - the recipe.toml snapshot captured in provenance.json.
 
 Usage:
-    uv run analysis/summarize_results.py <results.tgz | results_dir> [-o out.xlsx]
+    uv run analysis/summarize_results.py <results.tgz | results_dir> [-o out.xlsx] [--split-by-tp]
 
 If -o/--output is omitted, the workbook is named
-"<model>_<variant>_<timestamp>_summary.xlsx" and written next to the input.
+"<model>_<variant>_<timestamp>_summary.xlsx" (or "..._summary_by_tp.xlsx"
+with --split-by-tp) and written next to the input.
 """
 from __future__ import annotations
 
@@ -134,7 +137,24 @@ def numeric_sort_key(row: dict):
     return (num("tp"), num("isl"), num("osl"), num("conc"))
 
 
-def build_results_sheet(ws: Worksheet, results_dir: Path, rows: list[dict]) -> None:
+def group_rows_by_tp(rows: list[dict]) -> dict[int, list[dict]]:
+    """Group rows by integer TP value, sorted ascending. Unparseable TP
+    values (shouldn't happen given summary.csv's schema) fall into 0."""
+    groups: dict[int, list[dict]] = {}
+    for row in rows:
+        try:
+            tp = int(row.get("tp", 0))
+        except (TypeError, ValueError):
+            tp = 0
+        groups.setdefault(tp, []).append(row)
+    return dict(sorted(groups.items()))
+
+
+def build_results_sheet(
+    ws: Worksheet, results_dir: Path, rows: list[dict], include_tp_column: bool = True,
+) -> None:
+    summary_fields = SUMMARY_FIELDS if include_tp_column else [f for f in SUMMARY_FIELDS if f != "tp"]
+
     extra_keys: list[str] = []
     seen_extra: set[str] = set()
     parsed_rows: list[dict | None] = []
@@ -147,7 +167,7 @@ def build_results_sheet(ws: Worksheet, results_dir: Path, rows: list[dict]) -> N
                     seen_extra.add(k)
                     extra_keys.append(k)
 
-    header = SUMMARY_FIELDS + RESULT_FIELD_ORDER + extra_keys
+    header = summary_fields + RESULT_FIELD_ORDER + extra_keys
     ws.append(header)
     for cell in ws[1]:
         cell.font = Font(bold=True)
@@ -156,7 +176,7 @@ def build_results_sheet(ws: Worksheet, results_dir: Path, rows: list[dict]) -> N
     order = sorted(range(len(rows)), key=lambda i: numeric_sort_key(rows[i]))
     for i in order:
         row, data = rows[i], parsed_rows[i]
-        out = [row.get(f, "") for f in SUMMARY_FIELDS]
+        out = [row.get(f, "") for f in summary_fields]
         for f in RESULT_FIELD_ORDER + extra_keys:
             out.append(data.get(f, "") if data else "")
         ws.append(out)
@@ -251,6 +271,10 @@ def main() -> int:
         "-o", "--output", type=Path, default=None,
         help="output .xlsx path (default: derived from provenance, written next to input)",
     )
+    ap.add_argument(
+        "--split-by-tp", action="store_true",
+        help="one sheet per TP value ('TP=1', 'TP=2', ...) instead of a single combined Results sheet",
+    )
     args = ap.parse_args()
 
     if not args.input.exists():
@@ -268,9 +292,19 @@ def main() -> int:
         prov = json.loads(prov_path.read_text()) if prov_path.is_file() else {}
 
         wb = Workbook()
-        ws_results = wb.active
-        ws_results.title = "Results"
-        build_results_sheet(ws_results, results_dir, rows)
+        if args.split_by_tp:
+            tp_groups = group_rows_by_tp(rows)
+            first = True
+            for tp, tp_rows in tp_groups.items():
+                title = f"TP={tp}"
+                ws = wb.active if first else wb.create_sheet(title)
+                ws.title = title
+                first = False
+                build_results_sheet(ws, results_dir, tp_rows, include_tp_column=False)
+        else:
+            ws_results = wb.active
+            ws_results.title = "Results"
+            build_results_sheet(ws_results, results_dir, rows)
 
         ws_info = wb.create_sheet("Run Info")
         build_run_info_sheet(ws_info, prov)
@@ -285,7 +319,8 @@ def main() -> int:
             model = prov.get("model_name", "model")
             variant = prov.get("variant_name", "variant")
             ts = prov.get("timestamp_local", "results")
-            out_name = f"{model}_{variant}_{ts}_summary.xlsx"
+            suffix = "_by_tp" if args.split_by_tp else ""
+            out_name = f"{model}_{variant}_{ts}_summary{suffix}.xlsx"
             base = args.input if args.input.is_dir() else args.input.parent
             out_path = base / out_name
 
