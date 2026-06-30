@@ -460,6 +460,10 @@ EOF
 
   # Final teardown — kills server and syncs cache if still running.
   _teardown_current_server
+  # Clear the trap: its target's locals go out of scope when run_sweep
+  # returns, so leaving it armed causes an unbound-variable error when the
+  # caller (run_recipe.sh) exits and re-fires it outside this scope.
+  trap - EXIT INT TERM
 
   # Restore ownership: the bench client runs as root inside the container and
   # writes result files as uid 0. Chown the entire results dir back to the
