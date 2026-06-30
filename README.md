@@ -231,6 +231,11 @@ runtime-config JSON injection, `extra_files` mounts, `@TP@`/`@ISL@`/`@OSL@`
 To turn a results directory (or its downloaded `.tgz`) into an Excel
 summary workbook, see [analysis/README.md](analysis/README.md).
 
+To check on a sweep while it's running — combos done, current TP/shape/conc,
+elapsed time, rough ETA — run `scripts/common/monitor_sweep.sh <results_dir>`.
+It only reads the results dir and log file, so it's safe to run anytime
+alongside a live sweep.
+
 ## Python tooling
 
 Where Python is needed, scripts use [uv](https://github.com/astral-sh/uv) — no
