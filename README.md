@@ -222,11 +222,14 @@ Results land under `$HOME/results/<model>/<variant>/<timestamp>/`:
   apples-to-apples comparison across runs.
 - `summary.csv` — one row per `(TP, ISL, OSL, CONC)` combo
 - `<model>_<variant>_tp*_isl*_osl*_c*.json` — bench client output per combo
-- `server_tp*_isl*_osl*_c*.log` — server stdout per combo
+- `server_tp*.log` — server stdout, one per TP (server restarts only when TP changes)
 
 For full recipe authoring docs (TOML schema, custom Dockerfile builds,
 runtime-config JSON injection, `extra_files` mounts, `@TP@`/`@ISL@`/`@OSL@`
 /`@CONC@` placeholders) see [recipes/README.md](recipes/README.md).
+
+To turn a results directory (or its downloaded `.tgz`) into an Excel
+summary workbook, see [analysis/README.md](analysis/README.md).
 
 ## Python tooling
 
