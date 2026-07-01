@@ -33,6 +33,7 @@ while [ $# -gt 0 ]; do
     --yes|-y)         ASSUME_YES=1; shift ;;
     --skip-common)    SKIP_COMMON=1; shift ;;
     --vendor)         VENDOR_OVERRIDE="$2"; shift 2 ;;
+    -V|--version)     print_version; exit 0 ;;
     -h|--help)
       sed -n '2,25p' "$0"
       exit 0
