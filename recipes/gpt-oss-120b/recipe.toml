@@ -78,7 +78,7 @@ server_args = [
 [variants.nvidia_trtllm]
 vendor  = "nvidia"
 stack   = "trtllm"
-image   = "nvcr.io/nvidia/tensorrt-llm/release:1.2.0"
+image   = "nvcr.io/nvidia/tensorrt-llm/release:1.2.1"
 port    = 8000
 # trtllm-serve uses its own bench tool path, but the served endpoint is
 # OpenAI-compatible, so the vllm bench client works against it.

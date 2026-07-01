@@ -166,3 +166,40 @@ TORCHINDUCTOR_CACHE_DIR     = "${SHARED_ROOT}/torch_compile_cache"
 VLLM_USE_FLASHINFER_MOE_FP8 = "1"
 VLLM_FLASHINFER_MOE_BACKEND = "latency"
 VLLM_USE_DEEP_GEMM          = "0"
+
+
+# ----- NVIDIA / TensorRT-LLM -------------------------------------------------
+#
+# From NVIDIA's own quick-start recipe:
+# https://nvidia.github.io/TensorRT-LLM/deployment-guide/quick-start-recipe-for-qwen3-next-on-trtllm.html
+# Targets Qwen/Qwen3-Next-80B-A3B-Thinking (not the -Instruct-FP8 checkpoint
+# the vLLM variant above uses) — same caveat as kimi-k2-thinking: this is
+# "what NVIDIA recommends," not a same-checkpoint comparison to nvidia_vllm.
+# NOT verified end to end yet — the source page's own GPU-count math didn't
+# add up cleanly (tp_size 4 x pp_size 1 vs. a stated "8 GPUs" requirement);
+# recheck against the source once running and adjust tp_size/ep_size/pp_size.
+[variants.nvidia_trtllm]
+vendor           = "nvidia"
+stack            = "trtllm"
+model_id         = "Qwen/Qwen3-Next-80B-A3B-Thinking"
+image            = "nvcr.io/nvidia/tensorrt-llm/release:1.2.1"
+port             = 8000
+bench_extra_args = ["--trust-remote-code"]
+bench_tool       = "vllm"
+
+server_entrypoint = "trtllm-serve"
+server_args = [
+  "Qwen/Qwen3-Next-80B-A3B-Thinking",
+  "--host", "0.0.0.0",
+  "--port", "8000",
+  "--max_batch_size", "16",
+  "--max_num_tokens", "4096",
+  "--tp_size", "@TP@",
+  "--pp_size", "1",
+  "--ep_size", "@TP@",
+  "--trust_remote_code",
+  "--extra_llm_api_options", "/app/tensorrt_llm/examples/configs/curated/qwen3-next.yaml",
+]
+
+[variants.nvidia_trtllm.defaults]
+sweep_tp = [4]

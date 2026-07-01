@@ -1,0 +1,58 @@
+# Recipe: Kimi K2 Thinking (NVFP4, NVIDIA TensorRT-LLM)
+#
+# This is NOT a same-model comparison to the kimi-k2.6 recipe. It exists to
+# answer a different question: "what does NVIDIA engineering consider a
+# fully-optimized config on their own hardware?" NVIDIA publishes an official
+# TensorRT-LLM deployment guide only for Kimi-K2-Thinking-NVFP4 (not for
+# Kimi-K2.6, which its own HF card describes as prepared for vLLM). The guide
+# uses `trtllm-serve` directly with no Triton front end — see
+# recipes/kimi-k2-thinking/README.md for why Triton was intentionally left out.
+#
+# Source: https://github.com/NVIDIA/TensorRT-LLM/blob/main/docs/source/deployment-guide/deployment-guide-for-kimi-k2-thinking-on-trtllm.md
+
+[recipe]
+model_name  = "kimi-k2-thinking"
+model_id    = "nvidia/Kimi-K2-Thinking-NVFP4"
+description = "Moonshot Kimi K2 Thinking — NVFP4, NVIDIA's curated TensorRT-LLM Blackwell config"
+
+[recipe.defaults]
+# Same ISL/OSL/CONC matrix as the kimi-k2.6 vLLM sweep, for a shape-behavior
+# reference point even though the models differ.
+sweep_tp           = [8]
+sweep_isl_osl      = ["1024,1024", "1024,8192", "8192,1024"]
+sweep_conc         = [4, 8, 16, 32, 64, 128, 256]
+random_range_ratio = 0.8
+ready_timeout_s    = 3600
+
+
+# ----- NVIDIA / TensorRT-LLM (NVFP4) -----------------------------------------
+#
+# Uses NVIDIA's release container as-is (no build step) and the curated
+# performance config baked into that image — we deliberately do not
+# reconstruct these settings ourselves in server_args, to keep this the
+# config NVIDIA actually recommends rather than our reading of it.
+[variants.nvidia_trtllm]
+vendor           = "nvidia"
+stack            = "trtllm"
+model_id         = "nvidia/Kimi-K2-Thinking-NVFP4"
+image            = "nvcr.io/nvidia/tensorrt-llm/release:1.2.1"
+port             = 8000
+bench_extra_args = ["--trust-remote-code"]
+# trtllm-serve's endpoint is OpenAI-compatible, same as gpt-oss-120b's
+# nvidia_trtllm variant — the vllm bench client works against it unmodified.
+bench_tool = "vllm"
+
+server_entrypoint = "trtllm-serve"
+# @TP@ is intentionally unused: the curated YAML fixes 8-way expert
+# parallelism + 8-way attention data parallelism (matches an 8x B200 node).
+# sweep_tp = [8] above is informational (result filenames only), not a live
+# knob — there is nothing else to sweep it against here.
+server_args = [
+  "nvidia/Kimi-K2-Thinking-NVFP4",
+  "--host", "0.0.0.0",
+  "--port", "8000",
+  # --config is the current preferred name; gpt-oss-120b's nvidia_trtllm
+  # variant uses the older --extra_llm_api_options alias — both are the
+  # same flag as of trtllm-serve in this image.
+  "--config", "/app/tensorrt_llm/examples/configs/curated/kimi-k2-thinking.yaml",
+]
