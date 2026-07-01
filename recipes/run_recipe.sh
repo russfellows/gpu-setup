@@ -64,8 +64,9 @@ usage() {
 
 if [ "$#" -eq 0 ]; then usage; exit 1; fi
 case "$1" in
-  -h|--help)  usage; exit 0 ;;
-  --list)     list_recipes; exit 0 ;;
+  -h|--help)     usage; exit 0 ;;
+  -V|--version)  print_version; exit 0 ;;
+  --list)        list_recipes; exit 0 ;;
 esac
 
 MODEL="${1:-}"; shift || true

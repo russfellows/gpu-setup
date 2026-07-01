@@ -236,6 +236,18 @@ elapsed time, rough ETA — run `scripts/common/monitor_sweep.sh <results_dir>`.
 It only reads the results dir and log file, so it's safe to run anytime
 alongside a live sweep.
 
+## Version
+
+The repo version lives in the top-level [`VERSION`](VERSION) file (plain
+semver, e.g. `0.1.0`) — the single source of truth, bumped by hand as part of
+a PR when a change warrants it. Check it with:
+
+```bash
+./bootstrap.sh --version
+./recipes/run_recipe.sh --version
+cat VERSION
+```
+
 ## Python tooling
 
 Where Python is needed, scripts use [uv](https://github.com/astral-sh/uv) — no

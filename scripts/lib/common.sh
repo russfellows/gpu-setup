@@ -78,6 +78,20 @@ amd_gpu_family() {
   fi
 }
 
+# ---------- Version ----------
+# Repo root, computed relative to this file's own location (scripts/lib/),
+# so it resolves correctly regardless of which script sourced us.
+_COMMON_SH_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${_COMMON_SH_DIR}/../.." && pwd)"
+
+print_version() {
+  if [ -f "${REPO_ROOT}/VERSION" ]; then
+    cat "${REPO_ROOT}/VERSION"
+  else
+    echo "unknown"
+  fi
+}
+
 # ---------- Command checks ----------
 have() { command -v "$1" >/dev/null 2>&1; }
 
