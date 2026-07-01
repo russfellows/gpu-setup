@@ -7,7 +7,17 @@ then run reproducible LLM inference benchmarks across AMD and NVIDIA hardware.
 > Skip to **[docs/QUICKSTART.md](docs/QUICKSTART.md)** — it covers environment
 > verification, HF authentication, model downloads, and running your first recipe.
 
-## Assumptions
+**Contents:** [Getting Started / Initial Setup](#getting-started--initial-setup) ·
+[Running Recipes](#running-recipes) ·
+[Monitoring Test Runs](#monitoring-test-runs) ·
+[Analyzing Results](#analyzing-results) ·
+[Version](#version)
+
+---
+
+## Getting Started / Initial Setup
+
+### Assumptions
 
 The **only** things assumed in advance:
 
@@ -19,7 +29,7 @@ Everything else — driver state, CUDA/ROCm presence, kernel headers, container
 toolkit — is **detected at runtime**. If a working stack is already present,
 the scripts skip reinstall rather than risk breaking a working Neo-Cloud image.
 
-## Layout
+### Layout
 
 ```
 bootstrap.sh                 # top-level entrypoint: detect GPUs, dispatch
@@ -31,6 +41,7 @@ scripts/
     setup_docker.sh          # Docker CE + (NVIDIA hosts) nvidia-container-toolkit
     setup_hf_env.sh          # /etc/profile.d/huggingface.sh + HF cache on /mnt/data
     pull_serving_images.sh   # pre-pull vLLM / Triton / TRT-LLM / SGLang images
+    monitor_sweep.sh         # read-only: check progress of a live or finished sweep
   nvidia/
     setup_nvidia.sh          # CUDA + open driver + fabric manager + container toolkit
     verify_nvidia.sh         # post-reboot health checks
@@ -43,12 +54,13 @@ recipes/                     # benchmark sweep recipes — see recipes/README.md
   gpt-oss-120b/              # OpenAI GPT-OSS 120B
   kimi-k2.6/                 # Moonshot Kimi-K2.6 (MXFP4 on AMD, NVFP4 on NVIDIA)
   qwen3-next-80b/            # Qwen3-Next-80B-A3B-Instruct-FP8
+analysis/                    # post-hoc reporting: results dir/.tgz -> Excel workbook
 docs/
   QUICKSTART.md              # new-teammate guide: verify env, check HF token, run first recipe
   archive/                   # original drafts kept for reference
 ```
 
-## Usage
+### Bootstrap
 
 ```bash
 git clone https://github.com/russfellows/gpu-setup.git
@@ -65,7 +77,7 @@ sudo reboot
 sudo ./scripts/nvidia/verify_nvidia.sh   # or scripts/amd/verify_amd.sh
 ```
 
-### Detection-first behavior
+#### Detection-first behavior
 
 Each vendor script runs a health check before installing:
 
@@ -77,7 +89,7 @@ Each vendor script runs a health check before installing:
 If the stack passes, the script exits without changes. Override with
 `FORCE_REINSTALL=1`.
 
-### Environment variables
+#### Environment variables
 
 | Variable          | Default     | Meaning                                          |
 |-------------------|-------------|--------------------------------------------------|
@@ -90,7 +102,7 @@ If the stack passes, the script exits without changes. Override with
 
 Set `CUDA_VERSION=auto` or `ROCM_VERSION=auto` to accept whatever is already installed.
 
-### Manual override
+#### Manual override
 
 ```bash
 # Force the NVIDIA path even if detection is ambiguous
@@ -100,7 +112,7 @@ sudo ./bootstrap.sh --yes --vendor nvidia
 sudo ./bootstrap.sh --yes --skip-common
 ```
 
-## Storage setup (opt-in, separate)
+### Storage setup (opt-in, separate)
 
 Most fresh GPU boxes ship with multiple unused NVMe devices. The optional
 [`scripts/common/setup_storage.sh`](scripts/common/setup_storage.sh) script
@@ -120,7 +132,7 @@ sudo ./scripts/common/setup_storage.sh
 sudo ./scripts/common/setup_storage.sh --execute
 ```
 
-### RAID level by device count
+#### RAID level by device count
 
 | Disks | Layout                                                       |
 |-------|--------------------------------------------------------------|
@@ -131,7 +143,7 @@ sudo ./scripts/common/setup_storage.sh --execute
 | 5     | RAID-10 (4 active) + 1 hot spare                             |
 | N ≥ 6 | RAID-10 over the largest even count ≤ N; any odd leftover is a spare |
 
-### Safety screen
+#### Safety screen
 
 A device is included **only** if every check passes; any tripwire excludes it:
 
@@ -147,7 +159,7 @@ A device is included **only** if every check passes; any tripwire excludes it:
 Every device is printed with the reason it was kept or skipped, so you can
 audit the decision before running with `--execute`.
 
-### Storage env vars
+#### Storage env vars
 
 | Variable           | Default     | Meaning                                                 |
 |--------------------|-------------|---------------------------------------------------------|
@@ -157,7 +169,7 @@ audit the decision before running with `--execute`.
 | `EXCLUDE_DEVICES`  | (empty)     | Extra devices to skip, space-separated absolute paths   |
 | `CHUNK_KB`         | `512`       | mdadm chunk size (KiB)                                  |
 
-### XFS geometry choices
+#### XFS geometry choices
 
 - 4 KiB block size, 4 KiB sector size (NVMe is 4K LBA).
 - 2 GiB internal log — helps metadata throughput during large model downloads.
@@ -168,7 +180,7 @@ audit the decision before running with `--execute`.
 > is still maturing on Linux. We stick with 4 KiB; the AI-workload benefit
 > comes from stripe alignment + `largeio` + `allocsize=16m`, not from block size.
 
-## Serving stack setup (opt-in)
+### Serving stack setup (opt-in)
 
 Three independent helpers in [scripts/common/](scripts/common/) get the host
 ready to run containerized inference engines. None of them are wired into
@@ -190,7 +202,9 @@ DRY_RUN=1 ./scripts/common/pull_serving_images.sh        # show plan
 After authenticating with `hf auth login` (and optionally `gh auth login`),
 the host is ready to run recipes.
 
-## Benchmark recipes
+---
+
+## Running Recipes
 
 [`recipes/`](recipes/) holds reproducible benchmark sweeps for specific
 LLMs on specific serving stacks. A recipe is one TOML file describing the
@@ -215,6 +229,20 @@ client, and tears the container down between combinations.
 ./recipes/run_recipe.sh kimi-k2.6 amd_vllm --dry-run
 ```
 
+A full sweep across several TP values, shapes, and concurrencies can run for
+hours. Launch it in the background with output redirected to a log file so
+you can disconnect and check back later — see
+[Monitoring Test Runs](#monitoring-test-runs) below for how to watch progress
+against that log file.
+
+```bash
+mkdir -p /workspace/logs
+nohup ./recipes/run_recipe.sh gpt-oss-120b nvidia_vllm \
+    > /workspace/logs/gpt-oss-120b_full_sweep.log 2>&1 &
+```
+
+### Results directory layout
+
 Results land under `$HOME/results/<model>/<variant>/<timestamp>/`:
 
 - `provenance.json` — image digest, base image (for builds), build args, sweep
@@ -228,13 +256,105 @@ For full recipe authoring docs (TOML schema, custom Dockerfile builds,
 runtime-config JSON injection, `extra_files` mounts, `@TP@`/`@ISL@`/`@OSL@`
 /`@CONC@` placeholders) see [recipes/README.md](recipes/README.md).
 
-To turn a results directory (or its downloaded `.tgz`) into an Excel
-summary workbook, see [analysis/README.md](analysis/README.md).
+---
 
-To check on a sweep while it's running — combos done, current TP/shape/conc,
-elapsed time, rough ETA — run `scripts/common/monitor_sweep.sh <results_dir>`.
-It only reads the results dir and log file, so it's safe to run anytime
-alongside a live sweep.
+## Monitoring Test Runs
+
+A sweep writes one result file per `(TP, ISL, OSL, CONC)` combo as it goes, so
+you can check progress at any time without disturbing a running sweep.
+[`scripts/common/monitor_sweep.sh`](scripts/common/monitor_sweep.sh) is
+**read-only** — it only reads the results directory and a log file, never the
+sweep process itself — so it's safe to run anytime alongside a live sweep, or
+after the fact against a finished one.
+
+```bash
+scripts/common/monitor_sweep.sh <results_dir> [log_file] [total_combos]
+```
+
+- `results_dir` — a `recipes/run_recipe.sh` results directory (the one
+  containing `provenance.json`), e.g.
+  `$HOME/results/gpt-oss-120b/nvidia_vllm/20260629_222941/`
+- `log_file` *(optional)* — defaults to
+  `/workspace/logs/<model_name>_full_sweep.log`, where `<model_name>` is read
+  from `provenance.json`. Pass this explicitly if you logged the sweep
+  somewhere else (see the `nohup` example above).
+- `total_combos` *(optional)* — defaults to
+  `len(tp) * len(isl_osl) * len(conc)` computed from the sweep matrix in
+  `provenance.json`, when `jq` is available.
+
+```bash
+# Typical usage — everything inferred from provenance.json
+scripts/common/monitor_sweep.sh $HOME/results/gpt-oss-120b/nvidia_vllm/20260629_222941/
+
+# Explicit log file, e.g. if it isn't under /workspace/logs
+scripts/common/monitor_sweep.sh $HOME/results/gpt-oss-120b/nvidia_vllm/20260629_222941/ \
+    /path/to/gpt-oss-120b_full_sweep.log
+```
+
+Example output:
+
+```
+=== Sweep Progress: 20260629_222941 ===
+Results dir : /home/user/results/gpt-oss-120b/nvidia_vllm/20260629_222941
+Log file    : /workspace/logs/gpt-oss-120b_full_sweep.log
+
+Combos done : 47 / 84
+Current srv : ==== Starting server: TP=4 ====
+Current run : ---- Bench: ISL=8192 OSL=1024 CONC=64 ----
+Last status : [OK] tp=4 isl=8192 osl=1024 conc=32 -> ok
+Elapsed     : 3h14m
+Avg/combo   : 4m08s
+Est. remain : 2h32m (rough — pace varies a lot by shape/TP)
+
+tail -f "/workspace/logs/gpt-oss-120b_full_sweep.log"
+```
+
+The ETA is a straight-line average across combos already completed, so treat
+it as a rough estimate — different `(TP, shape)` combinations can take very
+different amounts of time per request.
+
+---
+
+## Analyzing Results
+
+Once a sweep finishes, [`analysis/summarize_results.py`](analysis/summarize_results.py)
+turns its results directory (or a downloaded `.tgz` of one) into a single
+Excel workbook — no manual spreadsheet wrangling of `summary.csv` and dozens
+of per-combo JSON files.
+
+The workbook has three sheets:
+
+- **Results** — one row per `(TP, ISL, OSL, CONC)` combo, every field from the
+  bench-client JSON (throughput, TTFT/TPOT/ITL/E2E latency percentiles, token
+  counts, etc.), sorted numerically with a frozen header row and autofilter.
+- **Run Info** — flattened `provenance.json`: model, vendor, image ref, GPU
+  inventory, host info, and the `gpu-setup` git commit the sweep ran at.
+- **Recipe TOML** — the exact `recipe.toml` snapshot captured at run time.
+
+```bash
+# Against a results directory
+uv run analysis/summarize_results.py $HOME/results/gpt-oss-120b/nvidia_vllm/20260629_222941/
+
+# Or directly against a downloaded .tgz archive
+uv run analysis/summarize_results.py gpt-oss-120b_20260629_222941.tgz
+
+# Explicit output path
+uv run analysis/summarize_results.py gpt-oss-120b_20260629_222941.tgz -o gpt-oss-120b_report.xlsx
+
+# One sheet per TP value (TP=1, TP=2, ...) instead of a single combined sheet
+uv run analysis/summarize_results.py gpt-oss-120b_20260629_222941.tgz --split-by-tp
+```
+
+Self-contained `uv run --script` — no project venv needed. If `-o`/`--output`
+is omitted, the workbook is named `<model>_<variant>_<timestamp>_summary.xlsx`
+and written next to the input. Rows whose `summary.csv` status isn't `ok`
+(e.g. `server_timeout`) are kept with blank metric columns rather than
+dropped, so failed combos stay visible.
+
+See [analysis/README.md](analysis/README.md) for the full field list and
+additional detail.
+
+---
 
 ## Version
 
