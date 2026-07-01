@@ -110,7 +110,7 @@ _load_env_profile() {
   local name="$1"
   local profile="${ENV_DIR}/${name}.sh"
   if [ ! -f "$profile" ]; then
-    err "Unknown environment '${name}'. Available: $(ls "${ENV_DIR}"/*.sh 2>/dev/null | xargs -n1 basename | sed 's/\.sh$//' | tr '\n' ' ')"
+    err "Unknown environment '${name}'. Available: $(find "${ENV_DIR}" -maxdepth 1 -name '*.sh' -print0 2>/dev/null | xargs -0n1 basename | sed 's/\.sh$//' | tr '\n' ' ')"
     exit 1
   fi
   # shellcheck disable=SC1090
