@@ -34,10 +34,12 @@ this repo has run on CUDA 13.0 nodes). You must relaunch the RunPod pod
 itself from that image before running this recipe:
 
 - **Image**: `nvcr.io/nvidia/tensorrt-llm/release:1.2.1`
-  (CUDA 12.8.1 — safe on any driver ≥ 525; well under the CUDA-13.1/driver-590
-  cliff that affects newer Triton Inference Server tags, so it isn't a
-  concern for this image specifically, but re-check `nvidia-smi` on
-  whatever node you use).
+  (based on `nvcr.io/nvidia/pytorch:25.10-py3` → CUDA 13.0.2, needs driver
+  ≥525 — well under the CUDA-13.1/driver-590 cliff that hits Triton
+  Inference Server tags 26.01+. Still worth a `nvidia-smi` sanity check on
+  whatever node you use, since this is the newest GA TensorRT-LLM release;
+  1.3.x exists only as release candidates as of this writing, which is why
+  we didn't pin to it for a benchmark run).
 - **Ports**: expose `8000` (HTTP, OpenAI-compatible — same port convention as
   the vLLM variants).
 - **Start command**: set explicitly — `bash -c "sleep infinity"` is enough;
