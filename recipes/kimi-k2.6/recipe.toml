@@ -186,11 +186,12 @@ build_args = { BASE_IMAGE = "rocm/vllm-dev:nightly_main", WITH_AMD_QUARK = "1" }
 
 # ----- NVIDIA / vLLM (NVFP4) -------------------------------------------------
 [variants.nvidia_vllm]
-vendor   = "nvidia"
-stack    = "vllm"
-model_id = "nvidia/Kimi-K2.6-NVFP4"
-image   = "vllm/vllm-openai:v0.21.0"
-port    = 8000
+vendor           = "nvidia"
+stack            = "vllm"
+model_id         = "nvidia/Kimi-K2.6-NVFP4"
+image            = "vllm/vllm-openai:v0.21.0"
+port             = 8000
+bench_extra_args = ["--trust-remote-code"]
 
 server_entrypoint = "vllm serve"
 server_args = [

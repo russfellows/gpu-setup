@@ -40,6 +40,19 @@ source "${_SWEEP_DIR}/docker_nvidia.sh"
 # shellcheck source=bench_client.sh
 source "${_SWEEP_DIR}/bench_client.sh"
 
+# Sync any vLLM compile artifacts that landed in the ephemeral home cache
+# to the persistent VLLM_CACHE_ROOT. Called after every native server shutdown
+# so cache is never lost to a pod restart. cp -rn (no-clobber) is safe to
+# call repeatedly — it only copies files that don't already exist at the dest.
+_sync_vllm_cache() {
+  local _src="${HOME}/.cache/vllm"
+  local _dst="${VLLM_CACHE_ROOT:-}"
+  if [ -n "$_dst" ] && [ -d "$_src" ]; then
+    cp -rn "$_src/." "$_dst/" 2>/dev/null || true
+    log "vLLM cache synced to ${_dst}"
+  fi
+}
+
 _default_ready_marker() {
   case "$1" in
     vllm|sglang|atom|trtllm) echo "Application startup complete" ;;
@@ -292,102 +305,140 @@ EOF
   echo "tp,isl,osl,conc,status,result_file" > "$SUMMARY"
 
   local rc_total=0
+  # Track the running server so we only restart when the server command changes.
+  # For most recipes ISL/OSL/CONC don't appear in server_args, so only a TP
+  # change triggers a restart — reducing server launches from N_combos to N_tp.
+  local _last_srv_cmd_str=""
+  local _srv_failed_cmd=""
+  local _native_server_pid=""
+  local _current_container=""
+  local LOG_FILE=""
+
+  # Tear down whichever server instance is currently running (native or docker).
+  _teardown_current_server() {
+    if [ "$NATIVE" = "0" ]; then
+      if [ -n "$_current_container" ]; then
+        docker logs "$_current_container" >> "$LOG_FILE" 2>&1 || true
+        docker rm -f "$_current_container" >/dev/null 2>&1 || true
+        _current_container=""
+      fi
+    else
+      if [ -n "$_native_server_pid" ]; then
+        kill "$_native_server_pid" 2>/dev/null || true
+        wait "$_native_server_pid" 2>/dev/null || true
+        _sync_vllm_cache
+        _native_server_pid=""
+      fi
+    fi
+    _last_srv_cmd_str=""
+  }
+
+  trap '_teardown_current_server' EXIT INT TERM
+
   for TP in "${_TP_ARR[@]}"; do
     for P in "${_ISLOSL_ARR[@]}"; do
       ISL="${P%,*}"; OSL="${P#*,}"
       for CONC in "${_CONC_ARR[@]}"; do
         local RESULT_FILENAME="${MODEL_NAME}_${VARIANT_NAME}_tp${TP}_isl${ISL}_osl${OSL}_c${CONC}.json"
-        local CONTAINER_NAME="recipe_${MODEL_NAME//./-}_${VARIANT_NAME}_$$"
-        local LOG_FILE="${RESULTS_DIR}/server_tp${TP}_isl${ISL}_osl${OSL}_c${CONC}.log"
 
         mapfile -t _SRV_CMD < <(_subst_placeholders "$TP" "$ISL" "$OSL" "$CONC" "${SERVER_CMD[@]}")
         # Re-quote each token so bash -lc receives a shell-safe single string.
         local _SRV_CMD_STR
         _SRV_CMD_STR=$(printf '%q ' "${_SRV_CMD[@]}")
 
-        log "---- Run: tp=$TP isl=$ISL osl=$OSL conc=$CONC ----"
-
-        local _native_server_pid=""
-        if [ "$NATIVE" = "0" ]; then
-          docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
-          # Guarantee cleanup even on SIGINT/SIGTERM or script exit.
-          # shellcheck disable=SC2064  # expansion at trap-set time is intentional
-          trap "docker rm -f '$CONTAINER_NAME' >/dev/null 2>&1 || true" EXIT INT TERM
-
-          # Launch detached (no --rm: we need to capture logs after exit).
-          docker run -d --name "$CONTAINER_NAME" \
-            "${VENDOR_FLAGS[@]}" \
-            "${HF_MOUNT[@]}" \
-            "${TORCH_CACHE_MOUNT[@]}" \
-            "${FILE_MOUNTS[@]}" \
-            -v "${RESULTS_DIR}:/results" \
-            "${HF_TOKEN_ENV[@]}" \
-            ${EXTRA_DOCKER_ENV[@]+"${EXTRA_DOCKER_ENV[@]}"} \
-            ${EXTRA_DOCKER_FLAGS[@]+"${EXTRA_DOCKER_FLAGS[@]}"} \
-            --entrypoint=/bin/bash \
-            "$IMAGE" -lc "$_SRV_CMD_STR" \
-            >/dev/null
-        else
-          # Native mode: extract KEY=VAL pairs from EXTRA_DOCKER_ENV (-e KEY=VAL ...).
-          local -a _native_env=()
-          local _i=0
-          while [ "$_i" -lt "${#EXTRA_DOCKER_ENV[@]}" ]; do
-            if [ "${EXTRA_DOCKER_ENV[$_i]}" = "-e" ]; then
-              _i=$(( _i + 1 ))
-              _native_env+=("${EXTRA_DOCKER_ENV[$_i]}")
-            fi
-            _i=$(( _i + 1 ))
-          done
-          # Launch server via uv so VIRTUAL_ENV is respected.
-          # PYTHONUNBUFFERED=1 forces Python to flush stdout/stderr immediately
-          # when writing to a file (not a TTY), so startup logs appear in real time.
-          env "${_native_env[@]+"${_native_env[@]}"}" \
-              HF_TOKEN="${_hf_token:-}" \
-              PYTHONUNBUFFERED=1 \
-              uv run --no-project bash -c "$_SRV_CMD_STR" > "$LOG_FILE" 2>&1 &
-          _native_server_pid=$!
-          # shellcheck disable=SC2064
-          trap "kill '$_native_server_pid' 2>/dev/null; wait '$_native_server_pid' 2>/dev/null || true" EXIT INT TERM
-          log "Native server launched (PID $_native_server_pid) — logging to $LOG_FILE"
-        fi
-
-        # Wait for ready marker.
-        local waited=0
-        local ready=0
-        while [ "$waited" -lt "$READY_TIMEOUT_S" ]; do
-          if [ "$NATIVE" = "0" ]; then
-            if docker logs "$CONTAINER_NAME" 2>&1 | grep -q "$READY_MARKER"; then
-              ready=1; break
-            fi
-            if ! docker ps -q --filter "name=^${CONTAINER_NAME}$" | grep -q .; then
-              err "Server container exited before becoming ready."
-              break
-            fi
-          else
-            if grep -q "$READY_MARKER" "$LOG_FILE" 2>/dev/null; then
-              ready=1; break
-            fi
-            if ! kill -0 "$_native_server_pid" 2>/dev/null; then
-              err "Server process $_native_server_pid exited before becoming ready."
-              break
-            fi
-          fi
-          sleep 10; waited=$((waited + 10))
-        done
-        if [ "$ready" -ne 1 ]; then
-          err "Server failed to reach '$READY_MARKER' in ${READY_TIMEOUT_S}s."
-          if [ "$NATIVE" = "0" ]; then
-            docker logs "$CONTAINER_NAME" > "$LOG_FILE" 2>&1 || true
-            docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
-          else
-            kill "$_native_server_pid" 2>/dev/null || true
-            wait "$_native_server_pid" 2>/dev/null || true
-          fi
+        # Skip all combos whose server command previously failed to start.
+        if [ -n "$_srv_failed_cmd" ] && [ "$_SRV_CMD_STR" = "$_srv_failed_cmd" ]; then
+          err "Skipping tp=$TP isl=$ISL osl=$OSL conc=$CONC — server failed for this TP."
           echo "$TP,$ISL,$OSL,$CONC,server_timeout," >> "$SUMMARY"
           rc_total=$((rc_total + 1))
           continue
         fi
-        ok "Server is ready (after ${waited}s)."
+
+        # (Re)start the server only when its command changes.
+        if [ "$_SRV_CMD_STR" != "$_last_srv_cmd_str" ]; then
+          _teardown_current_server
+
+          LOG_FILE="${RESULTS_DIR}/server_tp${TP}.log"
+          local CONTAINER_NAME="recipe_${MODEL_NAME//./-}_${VARIANT_NAME}_tp${TP}_$$"
+
+          log "==== Starting server: tp=$TP ===="
+
+          if [ "$NATIVE" = "0" ]; then
+            docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
+            # Launch detached (no --rm: we need to capture logs after exit).
+            docker run -d --name "$CONTAINER_NAME" \
+              "${VENDOR_FLAGS[@]}" \
+              "${HF_MOUNT[@]}" \
+              "${TORCH_CACHE_MOUNT[@]}" \
+              "${FILE_MOUNTS[@]}" \
+              -v "${RESULTS_DIR}:/results" \
+              "${HF_TOKEN_ENV[@]}" \
+              ${EXTRA_DOCKER_ENV[@]+"${EXTRA_DOCKER_ENV[@]}"} \
+              ${EXTRA_DOCKER_FLAGS[@]+"${EXTRA_DOCKER_FLAGS[@]}"} \
+              --entrypoint=/bin/bash \
+              "$IMAGE" -lc "$_SRV_CMD_STR" \
+              >/dev/null
+            _current_container="$CONTAINER_NAME"
+          else
+            # Native mode: extract KEY=VAL pairs from EXTRA_DOCKER_ENV (-e KEY=VAL ...).
+            local -a _native_env=()
+            local _i=0
+            while [ "$_i" -lt "${#EXTRA_DOCKER_ENV[@]}" ]; do
+              if [ "${EXTRA_DOCKER_ENV[$_i]}" = "-e" ]; then
+                _i=$(( _i + 1 ))
+                _native_env+=("${EXTRA_DOCKER_ENV[$_i]}")
+              fi
+              _i=$(( _i + 1 ))
+            done
+            # Launch server via uv so VIRTUAL_ENV is respected.
+            # PYTHONUNBUFFERED=1 forces Python to flush stdout/stderr immediately
+            # when writing to a file (not a TTY), so startup logs appear in real time.
+            env "${_native_env[@]+"${_native_env[@]}"}" \
+                HF_TOKEN="${_hf_token:-}" \
+                PYTHONUNBUFFERED=1 \
+                uv run --no-project bash -c "$_SRV_CMD_STR" > "$LOG_FILE" 2>&1 &
+            _native_server_pid=$!
+            log "Native server launched (PID $_native_server_pid) — logging to $LOG_FILE"
+          fi
+
+          # Wait for ready marker.
+          local waited=0
+          local ready=0
+          while [ "$waited" -lt "$READY_TIMEOUT_S" ]; do
+            if [ "$NATIVE" = "0" ]; then
+              if docker logs "$CONTAINER_NAME" 2>&1 | grep -q "$READY_MARKER"; then
+                ready=1; break
+              fi
+              if ! docker ps -q --filter "name=^${CONTAINER_NAME}$" | grep -q .; then
+                err "Server container exited before becoming ready."
+                break
+              fi
+            else
+              if grep -q "$READY_MARKER" "$LOG_FILE" 2>/dev/null; then
+                ready=1; break
+              fi
+              if ! kill -0 "$_native_server_pid" 2>/dev/null; then
+                err "Server process $_native_server_pid exited before becoming ready."
+                break
+              fi
+            fi
+            sleep 10; waited=$((waited + 10))
+          done
+
+          if [ "$ready" -ne 1 ]; then
+            err "Server failed to reach '$READY_MARKER' in ${READY_TIMEOUT_S}s."
+            _srv_failed_cmd="$_SRV_CMD_STR"
+            _teardown_current_server
+            echo "$TP,$ISL,$OSL,$CONC,server_timeout," >> "$SUMMARY"
+            rc_total=$((rc_total + 1))
+            continue
+          fi
+          ok "Server is ready (after ${waited}s)."
+          _last_srv_cmd_str="$_SRV_CMD_STR"
+          _srv_failed_cmd=""
+        fi
+
+        log "---- Bench: tp=$TP isl=$ISL osl=$OSL conc=$CONC ----"
 
         # Remove any stale result file before the bench run. vllm bench serve
         # appends (not overwrites) when the file exists — caused by the warmup
@@ -403,16 +454,16 @@ EOF
           rc_total=$((rc_total + 1))
         fi
 
-        if [ "$NATIVE" = "0" ]; then
-          docker logs "$CONTAINER_NAME" > "$LOG_FILE" 2>&1 || true
-          docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
-        else
-          kill "$_native_server_pid" 2>/dev/null || true
-          wait "$_native_server_pid" 2>/dev/null || true
-        fi
       done
     done
   done
+
+  # Final teardown — kills server and syncs cache if still running.
+  _teardown_current_server
+  # Clear the trap: its target's locals go out of scope when run_sweep
+  # returns, so leaving it armed causes an unbound-variable error when the
+  # caller (run_recipe.sh) exits and re-fires it outside this scope.
+  trap - EXIT INT TERM
 
   # Restore ownership: the bench client runs as root inside the container and
   # writes result files as uid 0. Chown the entire results dir back to the

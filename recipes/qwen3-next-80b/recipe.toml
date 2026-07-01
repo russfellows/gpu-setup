@@ -163,8 +163,6 @@ server_args = [
 [variants.nvidia_vllm.env]
 VLLM_CACHE_ROOT             = "${SHARED_ROOT}/vllm_cache"
 TORCHINDUCTOR_CACHE_DIR     = "${SHARED_ROOT}/torch_compile_cache"
-VLLM_ATTENTION_BACKEND      = "FLASH_ATTN"
 VLLM_USE_FLASHINFER_MOE_FP8 = "1"
 VLLM_FLASHINFER_MOE_BACKEND = "latency"
 VLLM_USE_DEEP_GEMM          = "0"
-VLLM_USE_TRTLLM_ATTENTION   = "0"

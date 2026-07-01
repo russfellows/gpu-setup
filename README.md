@@ -222,7 +222,7 @@ Results land under `$HOME/results/<model>/<variant>/<timestamp>/`:
   apples-to-apples comparison across runs.
 - `summary.csv` — one row per `(TP, ISL, OSL, CONC)` combo
 - `<model>_<variant>_tp*_isl*_osl*_c*.json` — bench client output per combo
-- `server_tp*_isl*_osl*_c*.log` — server stdout per combo
+- `server_tp*.log` — server stdout, one per TP (server restarts only when TP changes)
 
 For full recipe authoring docs (TOML schema, custom Dockerfile builds,
 runtime-config JSON injection, `extra_files` mounts, `@TP@`/`@ISL@`/`@OSL@`
@@ -230,6 +230,11 @@ runtime-config JSON injection, `extra_files` mounts, `@TP@`/`@ISL@`/`@OSL@`
 
 To turn a results directory (or its downloaded `.tgz`) into an Excel
 summary workbook, see [analysis/README.md](analysis/README.md).
+
+To check on a sweep while it's running — combos done, current TP/shape/conc,
+elapsed time, rough ETA — run `scripts/common/monitor_sweep.sh <results_dir>`.
+It only reads the results dir and log file, so it's safe to run anytime
+alongside a live sweep.
 
 ## Python tooling
 
