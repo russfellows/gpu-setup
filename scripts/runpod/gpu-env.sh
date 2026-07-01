@@ -41,7 +41,8 @@ unset HF_XET_HIGH_PERFORMANCE
 
 export HF_TOKEN_PATH="$HOME/.cache/huggingface/token"
 if [ -f "$HF_TOKEN_PATH" ]; then
-  export HF_TOKEN="$(cat "$HF_TOKEN_PATH")"
+  HF_TOKEN="$(cat "$HF_TOKEN_PATH")"
+  export HF_TOKEN
 fi
 
 # Activate the persistent vLLM venv (installed in /workspace/venv).
