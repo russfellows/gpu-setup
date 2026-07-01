@@ -41,14 +41,7 @@ jobs:
         run: |
           set -e
           for toml in recipes/*/recipe.toml; do
-            variants=$(uv run --python 3.12 - "$toml" <<'PY'
-import sys, tomllib
-with open(sys.argv[1], "rb") as f:
-    data = tomllib.load(f)
-for v in data.get("variants", {}):
-    print(v)
-PY
-            )
+            variants=$(uv run --script recipes/_common/list_variants.py "$toml")
             for variant in $variants; do
               echo "==> $toml :: $variant"
               uv run --script recipes/_common/load_recipe.py "$toml" "$variant" > /dev/null
